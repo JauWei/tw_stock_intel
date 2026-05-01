@@ -1,16 +1,17 @@
 """
-台股情報站 backend - FastAPI + yfinance + FinMind + Telegram
-啟動: python server.py  →  http://localhost:18505/
+美股情報站 backend - FastAPI + yfinance + Gemini + Telegram
+啟動: python server.py  →  http://localhost:18506/
 
 功能:
 - 即時價格 / OHLC / 技術指標 (yfinance)
-- 三大法人 (FinMind 免費端點)
+- 分析師評等 (yfinance.recommendations) 取代台股的三大法人
 - 持久化觀察清單 (watchlist.json)
 - 訊號偵測 (黃金/死亡交叉、KD 超買賣、突破 20 日新高低)
 - 多週期 K 線 (日/週/月)
-- 新聞 (yfinance 內建)
+- 英文新聞 + Gemini 自動翻成繁體中文
 - Telegram 警示 (每 5 分鐘背景掃描)
 - 熱度榜 / 族群分組
+- 季營收 + 季 EPS (yfinance quarterly_income_stmt)
 """
 from __future__ import annotations
 
@@ -41,22 +42,26 @@ GEMINI_FILE    = ROOT / "gemini.json"
 # Default watchlist (首次啟動時寫入 watchlist.json)
 # ----------------------------------------------------------------------------
 DEFAULT_WATCHLIST: dict[str, dict[str, str]] = {
-    "2330": {"name": "台積電",   "tag": "半導體 · 晶圓代工",       "yf": "2330.TW",  "group": "半導體"},
-    "2454": {"name": "聯發科",   "tag": "IC 設計 · 手機 SoC",       "yf": "2454.TW",  "group": "半導體"},
-    "6217": {"name": "中探針",   "tag": "半導體 · 探針卡",          "yf": "6217.TWO", "group": "半導體"},
-    "7734": {"name": "印能科技", "tag": "半導體 · 製程設備",        "yf": "7734.TWO", "group": "半導體"},
-    "6147": {"name": "頎邦",     "tag": "半導體 · IC 封測",         "yf": "6147.TWO", "group": "半導體"},
-    "3532": {"name": "台勝科",   "tag": "半導體 · 矽晶圓",          "yf": "3532.TW",  "group": "半導體"},
-    "6488": {"name": "環球晶",   "tag": "半導體 · 矽晶圓",          "yf": "6488.TWO", "group": "半導體"},
-    "8027": {"name": "鈦昇",     "tag": "半導體 · IC 封裝設備",     "yf": "8027.TWO", "group": "半導體"},
-    "8046": {"name": "南電",     "tag": "電子中游 · ABF 載板",      "yf": "8046.TW",  "group": "ABF載板"},
-    "3189": {"name": "景碩",     "tag": "電子中游 · ABF 載板",      "yf": "3189.TW",  "group": "ABF載板"},
-    "3037": {"name": "欣興",     "tag": "電子中游 · ABF 載板",      "yf": "3037.TW",  "group": "ABF載板"},
-    "2383": {"name": "台光電",   "tag": "電子中游 · PCB 材料",      "yf": "2383.TW",  "group": "PCB"},
-    "4958": {"name": "臻鼎-KY",  "tag": "電子中游 · PCB / 軟板",    "yf": "4958.TW",  "group": "PCB"},
-    "2308": {"name": "台達電",   "tag": "電子中游 · 電源管理",      "yf": "2308.TW",  "group": "AI伺服器"},
-    "3163": {"name": "波若威",   "tag": "光通訊 · 矽光子",          "yf": "3163.TWO", "group": "AI伺服器"},
-    "2317": {"name": "鴻海",     "tag": "電子下游 · 代工組裝",      "yf": "2317.TW",  "group": "AI伺服器"},
+    # 七巨頭 Magnificent 7
+    "AAPL":  {"name": "Apple",       "tag": "Tech · 消費電子",        "yf": "AAPL",  "group": "七巨頭"},
+    "MSFT":  {"name": "Microsoft",   "tag": "Tech · 雲端 / Office",   "yf": "MSFT",  "group": "七巨頭"},
+    "GOOGL": {"name": "Alphabet",    "tag": "Tech · 搜尋 / 廣告",     "yf": "GOOGL", "group": "七巨頭"},
+    "AMZN":  {"name": "Amazon",      "tag": "Tech · 電商 / AWS",      "yf": "AMZN",  "group": "七巨頭"},
+    "META":  {"name": "Meta",        "tag": "Tech · 社群 / VR",       "yf": "META",  "group": "七巨頭"},
+    "NVDA":  {"name": "NVIDIA",      "tag": "半導體 · GPU / AI",      "yf": "NVDA",  "group": "七巨頭"},
+    "TSLA":  {"name": "Tesla",       "tag": "EV / 自駕",              "yf": "TSLA",  "group": "七巨頭"},
+    # 半導體 Semiconductor
+    "AMD":   {"name": "AMD",         "tag": "半導體 · CPU / GPU",     "yf": "AMD",   "group": "半導體"},
+    "AVGO":  {"name": "Broadcom",    "tag": "半導體 · 網通 / ASIC",   "yf": "AVGO",  "group": "半導體"},
+    "TSM":   {"name": "TSMC ADR",    "tag": "半導體 · 晶圓代工",      "yf": "TSM",   "group": "半導體"},
+    "QCOM":  {"name": "Qualcomm",    "tag": "半導體 · 手機 SoC",      "yf": "QCOM",  "group": "半導體"},
+    "ARM":   {"name": "Arm Holdings","tag": "半導體 · IP",            "yf": "ARM",   "group": "半導體"},
+    # AI 概念
+    "PLTR":  {"name": "Palantir",    "tag": "AI · 軟體 / 數據",       "yf": "PLTR",  "group": "AI 概念"},
+    "SMCI":  {"name": "Super Micro", "tag": "AI · 伺服器",            "yf": "SMCI",  "group": "AI 概念"},
+    # 流媒體 / 金融
+    "NFLX":  {"name": "Netflix",     "tag": "流媒體",                  "yf": "NFLX",  "group": "其他"},
+    "JPM":   {"name": "JPMorgan",    "tag": "金融 · 銀行",            "yf": "JPM",   "group": "其他"},
 }
 
 CACHE_TTL = 300
@@ -212,57 +217,57 @@ def detect_signals(closes: pd.Series, ma5_s: pd.Series, ma20_s: pd.Series,
 
 
 # ----------------------------------------------------------------------------
-# 三大法人 (FinMind)
+# 分析師評等 (yfinance.recommendations) — 取代台股版的三大法人
 # ----------------------------------------------------------------------------
-def fetch_institutional(stock_id: str, days: int = 10) -> dict | None:
-    cached = cache_get(f"inst:{stock_id}")
+def fetch_institutional(yf_code: str, days: int = 10) -> dict | None:
+    """回傳近 N 個月分析師評等變化。
+    沿用台股版 institutional 資料形狀讓前端不必改：
+        fi (外資)   → strongBuy
+        it (投信)   → buy
+        dealer (自營商) → hold
+    使用者一看顏色即可分辨。負面評等(sell/strongSell) 加總後以 negative 一個欄位回傳。
+    """
+    cached = cache_get(f"inst:{yf_code}")
     if cached:
         return cached
-
     try:
-        end = pd.Timestamp.today()
-        start = end - pd.Timedelta(days=40)
-        url = "https://api.finmindtrade.com/api/v4/data"
-        params = {
-            "dataset": "TaiwanStockInstitutionalInvestorsBuySell",
-            "data_id": stock_id,
-            "start_date": start.strftime("%Y-%m-%d"),
-        }
-        r = requests.get(url, params=params, timeout=8)
-        r.raise_for_status()
-        data = r.json().get("data", [])
-        if not data:
-            return None
-
-        df = pd.DataFrame(data)
-        df["date"] = pd.to_datetime(df["date"])
-        df["net"] = (df["buy"] - df["sell"]) / 1000
-
-        FI_NAMES = {"Foreign_Investor", "Foreign_Dealer_Self", "外資自營商", "外資不含外資自營商"}
-        IT_NAMES = {"Investment_Trust", "投信"}
-
-        def bucket(name: str) -> str:
-            if name in FI_NAMES or "外資" in name or "Foreign" in name:
-                return "fi"
-            if name in IT_NAMES:
-                return "it"
-            return "dealer"
-
-        df["bucket"] = df["name"].apply(bucket)
-        daily = df.groupby(["date", "bucket"])["net"].sum().unstack(fill_value=0)
-        daily = daily.sort_index().tail(days)
-
-        out = {
-            "dates":  [d.strftime("%m/%d") for d in daily.index],
-            "fi":     [int(round(v)) for v in daily.get("fi",     pd.Series([0] * len(daily))).tolist()],
-            "it":     [int(round(v)) for v in daily.get("it",     pd.Series([0] * len(daily))).tolist()],
-            "dealer": [int(round(v)) for v in daily.get("dealer", pd.Series([0] * len(daily))).tolist()],
-        }
-        cache_set(f"inst:{stock_id}", out)
-        return out
+        rec = yf.Ticker(yf_code).recommendations
     except Exception as e:
-        print(f"[inst] {stock_id} 失敗: {e}")
+        print(f"[rec] {yf_code}: {e}")
         return None
+    if rec is None or len(rec) == 0:
+        return None
+
+    df = rec.copy()
+    if "period" in df.columns:
+        df = df.set_index("period")
+    df = df.sort_index().tail(days)
+    if df.empty:
+        return None
+
+    # 期間 label: 0m / -1m / -2m...
+    labels = []
+    for idx in df.index:
+        s = str(idx)
+        labels.append(s if s.startswith("-") or s == "0m" else s)
+
+    sb = df.get("strongBuy", pd.Series([0] * len(df))).fillna(0).astype(int).tolist()
+    b  = df.get("buy",        pd.Series([0] * len(df))).fillna(0).astype(int).tolist()
+    h  = df.get("hold",       pd.Series([0] * len(df))).fillna(0).astype(int).tolist()
+    sl = df.get("sell",       pd.Series([0] * len(df))).fillna(0).astype(int).tolist()
+    ssl= df.get("strongSell", pd.Series([0] * len(df))).fillna(0).astype(int).tolist()
+    negative = [-(s + ss) for s, ss in zip(sl, ssl)]  # 正負標示
+
+    out = {
+        "dates":  labels,
+        "fi":     sb,        # strongBuy → 對齊「外資」位置
+        "it":     b,         # buy
+        "dealer": h,         # hold
+        "neg":    negative,  # sell + strongSell 合併（顯示為負值）
+        "_legend": {"fi": "Strong Buy", "it": "Buy", "dealer": "Hold", "neg": "Sell"},
+    }
+    cache_set(f"inst:{yf_code}", out)
+    return out
 
 
 # ----------------------------------------------------------------------------
@@ -315,7 +320,7 @@ def fetch_stock(code: str, period: str = "D", force: bool = False) -> dict:
                 round(float(r["Low"]),   2),
                 round(float(r["High"]),  2),
             ],
-            "volume": int(round(r["Volume"] / 1000)) if r["Volume"] else 0,
+            "volume": int(r["Volume"]) if r["Volume"] else 0,    # 美股: shares (整數)
         }
         for idx, r in recent.iterrows()
     ]
@@ -342,8 +347,9 @@ def fetch_stock(code: str, period: str = "D", force: bool = False) -> dict:
     else:
         trend = "盤整"
 
-    avg_vol_5 = float(hist["Volume"].iloc[-5:].mean()) / 1000
-    today_vol = float(last["Volume"]) / 1000
+    # 美股 volume 單位為 shares，不像台股要除以 1000
+    avg_vol_5 = float(hist["Volume"].iloc[-5:].mean())
+    today_vol = float(last["Volume"])
     vol_change = (today_vol - avg_vol_5) / avg_vol_5 * 100 if avg_vol_5 > 0 else 0.0
 
     rsi_v = safe(rsi_s.iloc[-1]) or 50.0
@@ -397,23 +403,23 @@ def fetch_stock(code: str, period: str = "D", force: bool = False) -> dict:
                  "tp":    f"{int(round(price - swing*0.3))} / {int(round(price + swing*1))}"},
     }
 
-    inst = fetch_institutional(code) or {"dates": [], "fi": [], "it": [], "dealer": []}
-    fi_today = inst["fi"][-1] if inst["fi"] else 0
-    it_today = inst["it"][-1] if inst["it"] else 0
-    dealer_today = inst["dealer"][-1] if inst["dealer"] else 0
+    inst = fetch_institutional(info["yf"]) or {"dates": [], "fi": [], "it": [], "dealer": [], "neg": []}
+    fi_today = inst["fi"][-1] if inst["fi"] else 0      # Strong Buy
+    it_today = inst["it"][-1] if inst["it"] else 0      # Buy
+    dealer_today = inst["dealer"][-1] if inst["dealer"] else 0  # Hold
+    neg_today = abs(inst.get("neg", [0])[-1]) if inst.get("neg") else 0  # Sell + StrongSell
     fi_5  = sum(inst["fi"][-5:])  if inst["fi"] else 0
     fi_10 = sum(inst["fi"])       if inst["fi"] else 0
     it_10 = sum(inst["it"])       if inst["it"] else 0
 
-    bull_count = sum([fi_10 > 0, it_10 > 0])
-    if bull_count == 2:
-        chip_note = f"外資 {'+' if fi_10>=0 else ''}{fi_10}、投信 {'+' if it_10>=0 else ''}{it_10}（10日）同步買超。"
-    elif bull_count == 1:
-        chip_note = "三大法人意見分歧，籌碼中性。"
-    elif fi_10 < 0 and it_10 < 0:
-        chip_note = f"外資 {fi_10}、投信 {it_10}（10日）同步賣超。"
+    bullish = fi_today + it_today
+    bearish = neg_today
+    if bullish > bearish * 2 and bullish >= 5:
+        chip_note = f"分析師偏多：Strong Buy {fi_today} + Buy {it_today} 明顯多於 Sell {neg_today}。"
+    elif bearish > bullish:
+        chip_note = f"分析師偏空：Sell {neg_today} 多於買進評等 ({bullish})。"
     else:
-        chip_note = "尚未取得法人資料。"
+        chip_note = f"分析師中性：Buy {bullish} / Hold {dealer_today} / Sell {bearish}。"
 
     # 訊號（日/週/月皆計算，自動換 lookback 視窗）
     signals = detect_signals(closes, ma5_s, ma20_s, k_s, d_s, rsi_s, hist["High"], hist["Low"], period=period)
