@@ -1236,7 +1236,14 @@
  *  - 多週期 K 線 / 訊號徽章 / 熱度榜 / 新聞 / Telegram
  * ======================================================================= */
 
-const API_BASE = (location.protocol.startsWith("http") && location.host) ? "" : "http://localhost:18505";
+/* API_BASE 偵測：
+ * - 在 localhost:18505 或 127.0.0.1:18505 → 用相對路徑 (FastAPI 同源服務 HTML + API)
+ * - 其他情況（GitHub Pages、file://、其他 host）→ 強制連回本機 server
+ *   此情況需要 server 端開 CORS（已加 middleware），且使用者需先在電腦執行 python server.py
+ */
+const API_BASE = (location.host === "localhost:18505" || location.host === "127.0.0.1:18505")
+  ? ""
+  : "http://localhost:18505";
 
 /* ============== 最小 fallback (僅在 server 不可達時用) ============== */
 const FALLBACK_LIST = [
@@ -1245,13 +1252,29 @@ const FALLBACK_LIST = [
 ];
 
 /* ============== Helpers ============== */
+function _formatHttpErr(status, body) {
+  try {
+    const j = JSON.parse(body);
+    if (j.detail) return `HTTP ${status}: ${j.detail}`;
+    if (j.error)  return `HTTP ${status}: ${j.error}`;
+  } catch {}
+  // 收到 HTML → 多半 hit 到 GitHub Pages 等非 server 主機
+  if (body.trim().startsWith("<")) {
+    return "本機 server 未連線。請在電腦執行 python server.py 後重試。";
+  }
+  return `HTTP ${status}: ${body.slice(0, 120)}`;
+}
 async function apiGet(path, timeoutMs = 12000) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const r = await fetch(API_BASE + path, { signal: ctrl.signal });
-    if (!r.ok) throw new Error("HTTP " + r.status + " " + (await r.text()).slice(0, 80));
+    if (!r.ok) throw new Error(_formatHttpErr(r.status, await r.text()));
     return await r.json();
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error(`連線逾時 (${timeoutMs/1000}s)`);
+    if (e.name === "TypeError")  throw new Error("無法連線 server（請確認 python server.py 已啟動）");
+    throw e;
   } finally { clearTimeout(t); }
 }
 async function apiSend(path, method, body, timeoutMs = 12000) {
@@ -1264,8 +1287,12 @@ async function apiSend(path, method, body, timeoutMs = 12000) {
       body: body ? JSON.stringify(body) : undefined,
     });
     const txt = await r.text();
-    if (!r.ok) throw new Error("HTTP " + r.status + " " + txt.slice(0, 200));
+    if (!r.ok) throw new Error(_formatHttpErr(r.status, txt));
     return txt ? JSON.parse(txt) : {};
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error(`連線逾時 (${timeoutMs/1000}s)`);
+    if (e.name === "TypeError")  throw new Error("無法連線 server（請確認 python server.py 已啟動）");
+    throw e;
   } finally { clearTimeout(t); }
 }
 

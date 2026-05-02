@@ -33,7 +33,11 @@ python server.py
 
 開瀏覽器：[http://localhost:18505/](http://localhost:18505/)
 
-> ⚠️ **不能用 `file://` 直接點開 index.html**（CORS 會擋）。一定要走 server。
+### 也可以從 GitHub Pages 開（前端部份）
+
+如果你把 repo 啟用 GitHub Pages，可以從 `https://你的帳號.github.io/tw-stock-intel/` 開前端 UI，**但本機仍需執行 `python server.py`**——前端會自動跨域連到 `localhost:18505`。
+
+server 已開啟 CORS，從 GitHub Pages 載入的前端可以直接打本機 API。沒啟動 server 時 UI 會顯示「本機 server 未連線。請在電腦執行 python server.py 後重試」。
 
 ## 設定（選用）
 

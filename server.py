@@ -27,6 +27,7 @@ import pandas as pd
 import requests
 import yfinance as yf
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
@@ -669,7 +670,16 @@ def alert_worker():
 # ----------------------------------------------------------------------------
 # FastAPI app
 # ----------------------------------------------------------------------------
-app = FastAPI(title="台股情報站 API", version="2.0")
+app = FastAPI(title="台股情報站 API", version="3.1")
+
+# CORS：允許從 GitHub Pages、file://、其他主機載入的前端訪問本機 server
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def fetch_summary(code: str) -> dict:
