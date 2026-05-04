@@ -37,7 +37,13 @@ python server.py
 
 如果你把 repo 啟用 GitHub Pages，可以從 `https://你的帳號.github.io/tw-stock-intel/` 開前端 UI，**但本機仍需執行 `python server.py`**——前端會自動跨域連到 `localhost:18505`。
 
-server 已開啟 CORS，從 GitHub Pages 載入的前端可以直接打本機 API。沒啟動 server 時 UI 會顯示「本機 server 未連線。請在電腦執行 python server.py 後重試」。
+server 已開啟 CORS，從 GitHub Pages 載入的前端可以直接打本機 API。沒啟動 server 時 UI 會顯示「本機 server 未連線」。
+
+### 📱 手機 / 平板開（與電腦同 WiFi）
+
+**方法 A（推薦）**：手機開 `http://電腦LAN_IP:18505/`（如 `http://192.168.0.100:18505/`）。電腦 IP 從 `ipconfig` 找 IPv4。Windows 防火牆首次會跳對話框問允許私人網路，按允許。前端會自動偵測 host 帶 `:18505` 即為 server 同源，不必設定。
+
+**方法 B**：手機開 GitHub Pages，工具列「⚙️ Server」填 `http://電腦IP:18505` → 儲存（存 localStorage）。⚠️ HTTPS 頁面連 HTTP server 可能被瀏覽器擋（Mixed Content），若不行請用方法 A。
 
 ## 設定（選用）
 
