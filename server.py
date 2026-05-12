@@ -1323,8 +1323,30 @@ def api_ai_comment(code: str):
 
     portfolio = load_portfolio()  # list (multi-entry)
     holdings_of_code = [h for h in portfolio if h.get("code") == code]
+    wl = load_watchlist()
 
     sigs = "、".join(s["label"] for s in d.get("signals", [])) or "無強烈訊號"
+
+    # 月營收 YoY (最近 3 個月)
+    fund_line = ""
+    try:
+        from concurrent.futures import ThreadPoolExecutor
+        fund = api_fundamentals(code) if False else None  # 避開 endpoint 直接重用 cache 路徑
+        # 直接呼 cache 同樣的函式 (api_fundamentals 本身就有 cache)
+        # 為避免循環呼叫風險，這裡走 yfinance? 算了，直接從 FinMind 抓即可
+        cached_f = cache_get(f"fund:{code}")
+        if cached_f and cached_f.get("revenue"):
+            recent = cached_f["revenue"][-3:]
+            yoy_strs = []
+            for r in recent:
+                yoy = f"YoY {r['yoy']:+.1f}%" if r.get("yoy") is not None else "—"
+                rev_b = r["revenue"] / 1e8
+                yoy_strs.append(f"{r['ym']} {rev_b:.0f}億 {yoy}")
+            fund_line = f"\n月營收近 3 月：{' / '.join(yoy_strs)}"
+    except Exception:
+        pass
+
+    # 使用者持股 + 移動停利建議
     pos = ""
     if holdings_of_code:
         total_shares = sum(float(h.get("shares", 0)) for h in holdings_of_code)
@@ -1333,11 +1355,13 @@ def api_ai_comment(code: str):
         avg_cost = total_cost / total_shares if total_shares > 0 else 0
         ret = (d["price"] - avg_cost) / avg_cost * 100 if avg_cost else 0
         n = len(holdings_of_code)
-        pos = (f"\n使用者持股：{total_shares} 張 ({n} 筆)，"
-               f"平均成本 {avg_cost:.2f}，目前損益 {ret:+.2f}%")
+        yf_code = wl.get(code, {}).get("yf", code + ".TW")
+        trail = _trailing_stop_advice(yf_code, "", avg_cost, d["price"])
+        pos = (f"\n使用者持股：{total_shares} 張 ({n} 筆)，平均成本 {avg_cost:.2f}，"
+               f"損益 {ret:+.2f}%，移動停利建議：{trail.get('rule','—')}")
 
     prompt = f"""你是台股技術分析助理。用 4-6 句繁體中文評論以下個股，最後給「短線操作建議」一句話。
-請避免免責聲明、不要列點，直接給結論。
+請避免免責聲明、不要列點，直接給結論。評論時請綜合技術面 + 籌碼面 (三大法人) + 基本面 (月營收)。
 
 【{d['name']} ({d['code']}) {d['tag']}】
 收盤 {d['price']}（前日 {d['prev']}, {(d['price']-d['prev'])/d['prev']*100:+.2f}%）
@@ -1346,7 +1370,7 @@ RSI(14) = {d['rsi']}, KD(9,3) K/D = {d['kd_k']}/{d['kd_d']}, MACD {d['macd']}
 量能變化 {d['volChange']:+.1f}%（5日均量 {d['avgVol']} 張）
 外資 10 日累計 {d['chip']['fi_10']:+d} 張、投信 {d['chip']['it_10']:+d} 張
 近期訊號：{sigs}
-壓力 {d['resist']} / 支撐 {d['support']}{pos}
+壓力 {d['resist']} / 支撐 {d['support']}{fund_line}{pos}
 """
     try:
         text = _gemini_call(key, prompt)
