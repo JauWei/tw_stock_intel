@@ -1046,7 +1046,8 @@
       <span class="spacer" style="flex:0 0 12px;"></span>
       <span style="color:var(--muted); font-size:12px;">排序：</span>
       <div class="seg" id="rankSeg">
-        <div class="opt active" data-by="change">漲幅</div>
+        <div class="opt active" data-by="score">🎯 綜合評分</div>
+        <div class="opt" data-by="change">漲幅</div>
         <div class="opt" data-by="down">跌幅</div>
         <div class="opt" data-by="volume">成交量</div>
         <div class="opt" data-by="win">短線勝率</div>
@@ -1063,7 +1064,7 @@
       <table class="rank-table" id="rankTable">
         <thead>
           <tr>
-            <th>排名</th><th>代號</th><th>名稱</th><th>族群</th>
+            <th>排名</th><th>🎯 分數</th><th>代號</th><th>名稱</th><th>族群</th>
             <th>價格</th><th>漲跌幅</th><th>成交量</th>
             <th>外資</th><th>RSI</th><th>趨勢</th><th>訊號</th>
           </tr>
@@ -1934,33 +1935,42 @@ function updatePatterns(s) {
  * ======================================================================= */
 async function loadRanking(by = "change") {
   const tbody = document.querySelector("#rankTable tbody");
-  tbody.innerHTML = `<tr><td colspan="11" style="padding:30px; color:var(--muted);">📡 載入中...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="12" style="padding:30px; color:var(--muted);">📡 載入中...</td></tr>`;
   try {
-    const items = await apiGet(`/api/ranking?by=${by}`);
+    const items = await apiGet(`/api/ranking?by=${by}`, 60000);
     document.getElementById("rankCount").textContent = items.length + " 檔";
     tbody.innerHTML = items.map((r, i) => {
       const rankCls = i === 0 ? "gold" : i === 1 ? "silver" : i === 2 ? "bronze" : "normal";
-      const pctCls = r.change_pct >= 0 ? "up" : "down";
       const pctStr = (r.change_pct >= 0 ? "+" : "") + r.change_pct.toFixed(2) + "%";
-      const fiCls = r.fi_today >= 0 ? "up" : "down";
       const fiStr = (r.fi_today >= 0 ? "+" : "") + r.fi_today.toLocaleString();
       const sigs = (r.signals || []).slice(0, 3).map(s =>
         `<span class="badge ${s.color || 'cyan'}" style="margin-right:2px;">${s.label}</span>`).join("") || "—";
+      // 綜合評分
+      const score = r.score || 0;
+      const scoreColor = score >= 50 ? "var(--red)"
+                       : score >= 30 ? "var(--orange)"
+                       : score >= 10 ? "var(--cyan)"
+                       : score >= 0  ? "var(--muted)" : "var(--green)";
+      const plus = (r.score_plus  || []).join(" · ");
+      const minus= (r.score_minus || []).join(" · ");
+      const tip = `加分：${plus || '無'}\n扣分：${minus || '無'}`;
+      const isScoreSort = (by === "score");
       return `
         <tr data-code="${r.code}">
           <td><span class="rank-num ${rankCls}">${i+1}</span></td>
+          <td title="${tip.replace(/"/g, '&quot;')}" style="font-weight:${isScoreSort?'800':'700'}; font-size:${isScoreSort?'18px':'15px'}; color:${scoreColor};">${score >= 0 ? "+" : ""}${score}</td>
           <td><strong style="color:var(--yellow);">${r.code}</strong></td>
           <td>${r.name}</td>
           <td><span style="font-size:11px; color:var(--muted);">${r.group || '—'}</span></td>
           <td>${r.price.toFixed(2)}</td>
-          <td class="pct-cell ${pctCls === 'up' ? '' : 'down'}" style="color:${r.change_pct>=0?'var(--red)':'var(--green)'}">${pctStr}</td>
+          <td class="pct-cell" style="color:${r.change_pct>=0?'var(--red)':'var(--green)'}">${pctStr}</td>
           <td>${r.volume.toLocaleString()}</td>
           <td style="color:${r.fi_today>=0?'var(--red)':'var(--green)'}">${fiStr}</td>
           <td>${r.rsi.toFixed(1)}</td>
           <td><span style="font-size:11px;">${r.trend}</span></td>
           <td style="text-align:left;">${sigs}</td>
         </tr>`;
-    }).join("") || `<tr><td colspan="11" style="padding:30px; color:var(--muted);">無資料</td></tr>`;
+    }).join("") || `<tr><td colspan="12" style="padding:30px; color:var(--muted);">無資料</td></tr>`;
     tbody.querySelectorAll("tr[data-code]").forEach(tr => {
       tr.addEventListener("click", () => {
         state.activeCode = tr.dataset.code;

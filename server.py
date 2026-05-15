@@ -912,6 +912,65 @@ def api_ranking(by: str = "change"):
             })
         except Exception:
             pass
+
+    # 多因子綜合評分 (台股版 — 用外資/投信取代 PEG/13F)
+    for it in items:
+        score = 0
+        reasons_plus = []
+        reasons_minus = []
+        # 1. 外資買賣 (今日張數)
+        fi = it.get("fi_today", 0) or 0
+        if fi >= 1000:
+            score += 20; reasons_plus.append(f"外資 +{fi} 張")
+        elif fi >= 300:
+            score += 12; reasons_plus.append(f"外資 +{fi} 張")
+        elif fi <= -1000:
+            score -= 15; reasons_minus.append(f"外資 {fi} 張")
+        elif fi <= -300:
+            score -= 8; reasons_minus.append(f"外資 {fi} 張")
+        # 2. 投信買賣
+        it_t = it.get("it_today", 0) or 0
+        if it_t >= 500:
+            score += 12; reasons_plus.append(f"投信 +{it_t} 張")
+        elif it_t >= 100:
+            score += 6; reasons_plus.append(f"投信 +{it_t} 張")
+        elif it_t <= -500:
+            score -= 10; reasons_minus.append(f"投信 {it_t} 張")
+        # 3. 短線勝率
+        wr = it.get("win_rate", 0) or 0
+        if wr >= 65:
+            score += 15; reasons_plus.append(f"勝率 {wr}%")
+        elif wr >= 55:
+            score += 8; reasons_plus.append(f"勝率 {wr}%")
+        # 4. 訊號 (顏色)
+        sigs = it.get("signals", []) or []
+        bull = sum(1 for s in sigs if s.get("color") == "red")
+        bear = sum(1 for s in sigs if s.get("color") == "green")
+        overheat = sum(1 for s in sigs if s.get("color") == "orange")
+        if bull >= 2:
+            score += 10; reasons_plus.append(f"{bull} 多頭訊號")
+        elif bull == 1:
+            score += 5
+        score -= bear * 8
+        score -= overheat * 5
+        if bear: reasons_minus.append(f"{bear} 空頭訊號")
+        if overheat: reasons_minus.append(f"{overheat} 過熱警示")
+        # 5. RSI 極端
+        rsi_v = it.get("rsi", 50) or 50
+        if rsi_v > 75:
+            score -= 12; reasons_minus.append(f"RSI {rsi_v:.0f} 超買")
+        elif rsi_v < 30:
+            score += 8; reasons_plus.append(f"RSI {rsi_v:.0f} 超賣")
+        # 6. 趨勢
+        trend = it.get("trend", "")
+        if "多頭" in trend:
+            score += 5
+        elif "空頭" in trend:
+            score -= 5; reasons_minus.append("空頭趨勢")
+        it["score"] = score
+        it["score_plus"]  = reasons_plus
+        it["score_minus"] = reasons_minus
+
     keymap = {
         "change":   lambda x: -x["change_pct"],
         "down":     lambda x:  x["change_pct"],
@@ -923,6 +982,7 @@ def api_ranking(by: str = "change"):
         "win":      lambda x: -x["win_rate"],
         "signals":  lambda x: -x["signal_count"],
         "bias":     lambda x: -abs(x["bias"]),
+        "score":    lambda x: -x["score"],          # 🎯 綜合評分
     }
     items.sort(key=keymap.get(by, keymap["change"]))
     return items
