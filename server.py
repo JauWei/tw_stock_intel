@@ -42,22 +42,54 @@ GEMINI_FILE    = ROOT / "gemini.json"
 # Default watchlist (首次啟動時寫入 watchlist.json)
 # ----------------------------------------------------------------------------
 DEFAULT_WATCHLIST: dict[str, dict[str, str]] = {
-    "2330": {"name": "台積電",   "tag": "半導體 · 晶圓代工",       "yf": "2330.TW",  "group": "半導體"},
-    "2454": {"name": "聯發科",   "tag": "IC 設計 · 手機 SoC",       "yf": "2454.TW",  "group": "半導體"},
-    "6217": {"name": "中探針",   "tag": "半導體 · 探針卡",          "yf": "6217.TWO", "group": "半導體"},
-    "7734": {"name": "印能科技", "tag": "半導體 · 製程設備",        "yf": "7734.TWO", "group": "半導體"},
-    "6147": {"name": "頎邦",     "tag": "半導體 · IC 封測",         "yf": "6147.TWO", "group": "半導體"},
-    "3532": {"name": "台勝科",   "tag": "半導體 · 矽晶圓",          "yf": "3532.TW",  "group": "半導體"},
-    "6488": {"name": "環球晶",   "tag": "半導體 · 矽晶圓",          "yf": "6488.TWO", "group": "半導體"},
-    "8027": {"name": "鈦昇",     "tag": "半導體 · IC 封裝設備",     "yf": "8027.TWO", "group": "半導體"},
-    "8046": {"name": "南電",     "tag": "電子中游 · ABF 載板",      "yf": "8046.TW",  "group": "ABF載板"},
-    "3189": {"name": "景碩",     "tag": "電子中游 · ABF 載板",      "yf": "3189.TW",  "group": "ABF載板"},
-    "3037": {"name": "欣興",     "tag": "電子中游 · ABF 載板",      "yf": "3037.TW",  "group": "ABF載板"},
-    "2383": {"name": "台光電",   "tag": "電子中游 · PCB 材料",      "yf": "2383.TW",  "group": "PCB"},
-    "4958": {"name": "臻鼎-KY",  "tag": "電子中游 · PCB / 軟板",    "yf": "4958.TW",  "group": "PCB"},
-    "2308": {"name": "台達電",   "tag": "電子中游 · 電源管理",      "yf": "2308.TW",  "group": "AI伺服器"},
-    "3163": {"name": "波若威",   "tag": "光通訊 · 矽光子",          "yf": "3163.TWO", "group": "AI伺服器"},
-    "2317": {"name": "鴻海",     "tag": "電子下游 · 代工組裝",      "yf": "2317.TW",  "group": "AI伺服器"},
+    # 1. 晶圓代工 (Foundry)
+    "2330": {"name": "台積電",   "tag": "晶圓代工 · 先進製程",       "yf": "2330.TW",  "group": "晶圓代工"},
+
+    # 2. IC 設計 (含 IP)
+    "2454": {"name": "聯發科",   "tag": "IC 設計 · 手機 SoC",        "yf": "2454.TW",  "group": "IC 設計"},
+    "3661": {"name": "世芯-KY",  "tag": "IP / ASIC 設計服務",        "yf": "3661.TW",  "group": "IP / 矽智財"},
+
+    # 3. 探針卡 / 封測
+    "6217": {"name": "中探針",   "tag": "封測 · 探針卡",             "yf": "6217.TWO", "group": "封測"},
+    "6147": {"name": "頎邦",     "tag": "封測 · 驅動 IC",            "yf": "6147.TWO", "group": "封測"},
+
+    # 4. 先進封裝設備 (CoWoS)
+    "6187": {"name": "萬潤",     "tag": "先進封裝設備 (CoWoS)",       "yf": "6187.TWO", "group": "先進封裝"},
+    "3131": {"name": "弘塑",     "tag": "先進封裝設備 · 清洗",       "yf": "3131.TWO", "group": "先進封裝"},
+    "7734": {"name": "印能科技", "tag": "半導體 · 烘烤製程設備",     "yf": "7734.TWO", "group": "先進封裝"},
+    "8027": {"name": "鈦昇",     "tag": "IC 封裝設備",               "yf": "8027.TWO", "group": "先進封裝"},
+
+    # 5. 矽晶圓 / 上游材料
+    "3532": {"name": "台勝科",   "tag": "矽晶圓 · 磊晶",             "yf": "3532.TW",  "group": "矽晶圓"},
+    "6488": {"name": "環球晶",   "tag": "矽晶圓 · 全球前段",         "yf": "6488.TWO", "group": "矽晶圓"},
+
+    # 6. ABF 載板 (三劍客)
+    "8046": {"name": "南電",     "tag": "ABF 載板",                   "yf": "8046.TW",  "group": "ABF 載板"},
+    "3189": {"name": "景碩",     "tag": "ABF 載板",                   "yf": "3189.TW",  "group": "ABF 載板"},
+    "3037": {"name": "欣興",     "tag": "ABF 載板",                   "yf": "3037.TW",  "group": "ABF 載板"},
+
+    # 7. 高速 CCL / PCB
+    "2383": {"name": "台光電",   "tag": "高速銅箔基板 (CCL)",         "yf": "2383.TW",  "group": "高速 CCL"},
+    "4958": {"name": "臻鼎-KY",  "tag": "PCB / 軟板",                 "yf": "4958.TW",  "group": "PCB / 軟板"},
+
+    # 8. 矽光子 / CPO 光通訊
+    "3163": {"name": "波若威",   "tag": "光通訊 · 矽光子",            "yf": "3163.TWO", "group": "矽光子 / CPO"},
+    "3081": {"name": "聯亞",     "tag": "光通訊 · 雷射晶粒",          "yf": "3081.TWO", "group": "矽光子 / CPO"},
+
+    # 9. 伺服器代工 (ODM)
+    "2317": {"name": "鴻海",     "tag": "伺服器代工 · ODM",           "yf": "2317.TW",  "group": "伺服器 ODM"},
+    "6669": {"name": "緯穎",     "tag": "AI 伺服器代工",              "yf": "6669.TW",  "group": "伺服器 ODM"},
+
+    # 10. 散熱模組
+    "3017": {"name": "奇鋐",     "tag": "散熱模組 · 液冷",            "yf": "3017.TW",  "group": "散熱模組"},
+    "3324": {"name": "雙鴻",     "tag": "散熱模組",                   "yf": "3324.TW",  "group": "散熱模組"},
+
+    # 11. 電源管理 / BBU 備援電池
+    "2308": {"name": "台達電",   "tag": "電源管理 · AI 電源",         "yf": "2308.TW",  "group": "電源 / BBU"},
+    "6121": {"name": "新普",     "tag": "BBU 備援電池",               "yf": "6121.TWO", "group": "電源 / BBU"},
+
+    # 12. BMC 伺服器管理晶片
+    "5274": {"name": "信驊",     "tag": "BMC 伺服器管理晶片",         "yf": "5274.TW",  "group": "BMC / 周邊"},
 }
 
 CACHE_TTL = 300
@@ -93,12 +125,36 @@ def save_json(p: Path, data: Any) -> None:
         p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _migrate_watchlist_groups(wl: dict) -> dict:
+    """套用 DEFAULT_WATCHLIST 的最新族群分類到既有清單。
+    規則：
+    - 既有代號若在 DEFAULT 內，更新 group / tag / name 為新版（族群細分）
+    - 既有代號不在 DEFAULT 內（user 自行加的）→ 保留不動
+    - DEFAULT 有但既有清單沒有 → 不自動加入（避免 user 刻意刪除的又跑回來）
+    """
+    changed = False
+    for code, default_meta in DEFAULT_WATCHLIST.items():
+        if code in wl:
+            cur = wl[code]
+            # 只有 group 或 tag 不同才更新 (yf 不動)
+            if cur.get("group") != default_meta["group"] or cur.get("tag") != default_meta["tag"]:
+                cur["group"] = default_meta["group"]
+                cur["tag"]   = default_meta["tag"]
+                if not cur.get("name"):
+                    cur["name"] = default_meta["name"]
+                changed = True
+    if changed:
+        save_json(WATCHLIST_FILE, wl)
+        print(f"[migrate] watchlist 族群分類已套用最新版")
+    return wl
+
+
 def load_watchlist() -> dict:
     wl = load_json(WATCHLIST_FILE, None)
     if wl is None:
         save_json(WATCHLIST_FILE, DEFAULT_WATCHLIST)
         return DEFAULT_WATCHLIST.copy()
-    return wl
+    return _migrate_watchlist_groups(wl)
 
 
 def load_alerts() -> dict:
@@ -995,6 +1051,24 @@ def api_del_alert(code: str):
 def api_refresh():
     _cache.clear()
     return {"ok": True, "msg": "快取已清除"}
+
+
+@app.post("/api/seed-defaults")
+def api_seed_defaults():
+    """把 DEFAULT_WATCHLIST 中還沒在 watchlist.json 的股票補進去。"""
+    wl = load_watchlist()
+    added = []
+    for code, meta in DEFAULT_WATCHLIST.items():
+        if code not in wl:
+            wl[code] = dict(meta)
+            added.append(code)
+    if added:
+        save_json(WATCHLIST_FILE, wl)
+        for k in list(_cache.keys()):
+            if k.startswith("summary:") or k.startswith("stock:"):
+                _cache.pop(k, None)
+    return {"ok": True, "added": added, "n_added": len(added),
+            "msg": f"已新增 {len(added)} 檔到觀察清單"}
 
 
 # ============================================================================

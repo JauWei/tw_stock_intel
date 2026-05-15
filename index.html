@@ -1142,13 +1142,34 @@
     <label>族群分類</label>
     <select id="addGroup">
       <option value="自選">自選</option>
-      <option value="半導體">半導體</option>
-      <option value="ABF載板">ABF載板</option>
-      <option value="PCB">PCB</option>
-      <option value="AI伺服器">AI伺服器</option>
-      <option value="生技">生技</option>
-      <option value="金融">金融</option>
-      <option value="其他">其他</option>
+      <optgroup label="AI 核心供應鏈">
+        <option value="IP / 矽智財">IP / 矽智財</option>
+        <option value="先進封裝">先進封裝 (CoWoS)</option>
+        <option value="散熱模組">散熱模組</option>
+        <option value="伺服器 ODM">伺服器 ODM</option>
+        <option value="電源 / BBU">電源 / BBU</option>
+        <option value="BMC / 周邊">BMC / 周邊</option>
+      </optgroup>
+      <optgroup label="半導體">
+        <option value="晶圓代工">晶圓代工</option>
+        <option value="IC 設計">IC 設計</option>
+        <option value="封測">封測</option>
+        <option value="矽晶圓">矽晶圓</option>
+        <option value="記憶體">記憶體</option>
+      </optgroup>
+      <optgroup label="電子零組件">
+        <option value="ABF 載板">ABF 載板</option>
+        <option value="高速 CCL">高速 CCL</option>
+        <option value="PCB / 軟板">PCB / 軟板</option>
+        <option value="矽光子 / CPO">矽光子 / CPO</option>
+      </optgroup>
+      <optgroup label="其他產業">
+        <option value="金融">金融</option>
+        <option value="生技">生技</option>
+        <option value="傳產">傳產</option>
+        <option value="持股">持股</option>
+        <option value="其他">其他</option>
+      </optgroup>
     </select>
 
     <div class="probe-result" id="addResult"></div>
