@@ -779,6 +779,22 @@ def check_alert(code: str, price: float, prev: float, name: str = "",
         labels = "、".join(s.get("label", "") for s in (signals or [])[:5])
         triggered.append(f"🎯 *{name} ({code})* 訊號爆發！{len(sig_keys)} 個訊號:\n{labels}")
 
+    # Drawdown 警示 (從 60d 高點回檔 X%)
+    dd_pct = rule.get("drawdown_pct")
+    if dd_pct is not None:
+        peak = rule.get("peak_price")
+        if peak is None or price > float(peak):
+            peak = price
+        rule["peak_price"] = peak
+        last_dd = rule.get("last_drawdown", 0) or 0
+        cur_dd  = (peak - price) / peak * 100 if peak else 0
+        if cur_dd >= float(dd_pct) and last_dd < float(dd_pct):
+            triggered.append(
+                f"🩸 *{name} ({code})* 從 60d 高點回檔 *{cur_dd:.1f}%*\n"
+                f"高點 *{peak:.2f}* → 現價 *{price:.2f}* (閾值 {dd_pct}%)"
+            )
+        rule["last_drawdown"] = cur_dd
+
     rule["last_price"]    = price
     rule["last_rsi"]      = rsi if rsi is not None else last_rsi
     rule["last_sig_keys"] = list(sig_keys)
@@ -1840,6 +1856,174 @@ def api_group_rotation():
     rotation.sort(key=lambda x: -x["momentum"])
     cache_set(cache_key, rotation)
     return rotation
+
+
+# ============================================================================
+# 市場寬度 (Breadth) — 台股版
+# ============================================================================
+@app.get("/api/breadth")
+def api_breadth():
+    """watchlist 寬度 + 加權指數 vs 0050/0056 比較。"""
+    cache_key = "breadth"
+    cached = cache_get(cache_key)
+    if cached:
+        return cached
+
+    wl = load_watchlist()
+    above_20 = above_60 = 0
+    advancers = decliners = 0
+    total = 0
+    bull_trend = bear_trend = 0
+    for code in wl:
+        try:
+            d = fetch_stock(code)
+        except Exception:
+            continue
+        total += 1
+        price = d["price"]
+        ma20  = d.get("ma20") or 0
+        ma60  = d.get("ma60") or 0
+        prev  = d.get("prev") or 0
+        if ma20 and price > ma20: above_20 += 1
+        if ma60 and price > ma60: above_60 += 1
+        if prev:
+            if price > prev: advancers += 1
+            elif price < prev: decliners += 1
+        if "多頭" in d.get("trend", ""): bull_trend += 1
+        elif "空頭" in d.get("trend", ""): bear_trend += 1
+
+    pct_20 = round(above_20 / total * 100, 1) if total else 0
+    pct_60 = round(above_60 / total * 100, 1) if total else 0
+    ad_ratio = round(advancers / decliners, 2) if decliners else (advancers if advancers else 0)
+
+    # ^TWII (加權) vs 0050.TW (大盤 ETF) vs 0056.TW (高股息中型股) 對比
+    twii_chg = etf50_chg = etf56_chg = None
+    twii_vs_56 = None
+    try:
+        end = pd.Timestamp.today()
+        start = end - pd.Timedelta(days=10)
+        data = yf.download(["^TWII", "0050.TW", "0056.TW"], start=start, end=end,
+                           auto_adjust=False, progress=False, group_by="ticker", threads=True)
+        def _last_chg(ticker):
+            try:
+                c = data[ticker]["Close"]
+                if len(c) >= 2:
+                    return float((c.iloc[-1] - c.iloc[-2]) / c.iloc[-2] * 100)
+            except Exception:
+                return None
+            return None
+        twii_chg  = _last_chg("^TWII")
+        etf50_chg = _last_chg("0050.TW")
+        etf56_chg = _last_chg("0056.TW")
+        if twii_chg is not None and etf56_chg is not None:
+            # 加權拉但 0056 沒跟 → 大型權值股拉動,中型股弱
+            twii_vs_56 = round(twii_chg - etf56_chg, 2)
+    except Exception as e:
+        print(f"[breadth twii] {e}")
+
+    status = "neutral"
+    note = ""
+    if pct_20 >= 70 and pct_60 >= 60:
+        status = "strong"; note = "多頭格局明確"
+    elif pct_20 >= 50 and pct_60 >= 50:
+        status = "healthy"; note = "偏多但留意過熱"
+    elif pct_20 < 40 and pct_60 < 40:
+        status = "weak"; note = "短中線都失守,警戒"
+    elif pct_60 < 50 and pct_20 > 60:
+        status = "divergence"; note = "短線拉、中線弱,假反彈警惕"
+
+    out = {
+        "total":         total,
+        "pct_above_50":  pct_20,   # 鏡像 US 欄位名,以便共用前端代碼
+        "pct_above_200": pct_60,
+        "advancers":     advancers,
+        "decliners":     decliners,
+        "unchanged":     total - advancers - decliners,
+        "ad_ratio":      ad_ratio,
+        "bull_trend":    bull_trend,
+        "bear_trend":    bear_trend,
+        "spy_change":    round(twii_chg,  2) if twii_chg  is not None else None,
+        "rsp_change":    round(etf56_chg, 2) if etf56_chg is not None else None,
+        "spy_vs_rsp":    twii_vs_56,
+        "status":        status,
+        "note":          note,
+    }
+    cache_set(cache_key, out)
+    return out
+
+
+# ============================================================================
+# 52 週新高 / 新低掃描 — 台股版
+# ============================================================================
+@app.get("/api/52w-scan")
+def api_52w_scan():
+    """掃描 watchlist 創 52 週新高/新低的個股。"""
+    cache_key = "52w_scan"
+    cached = cache_get(cache_key)
+    if cached:
+        return cached
+
+    wl = load_watchlist()
+    end = pd.Timestamp.today()
+    start = end - pd.Timedelta(days=400)
+    yf_codes = [wl[c]["yf"] for c in wl]
+    codes = list(wl.keys())
+    new_highs = []
+    new_lows = []
+    near_highs = []
+    try:
+        data = yf.download(yf_codes, start=start, end=end, auto_adjust=False,
+                           progress=False, group_by="ticker", threads=True)
+    except Exception as e:
+        raise HTTPException(503, f"yfinance batch fail: {e}")
+
+    for code, yfc in zip(codes, yf_codes):
+        try:
+            df = data[yfc] if len(yf_codes) > 1 else data
+            close = df["Close"].dropna()
+            vol   = df["Volume"].dropna()
+            if len(close) < 252:
+                continue
+            year = close.iloc[-252:]
+            cur = float(close.iloc[-1])
+            prev = float(close.iloc[-2]) if len(close) >= 2 else cur
+            year_high = float(year.max())
+            year_low  = float(year.min())
+            cur_vol = float(vol.iloc[-1]) if len(vol) else 0
+            avg_vol_20 = float(vol.iloc[-20:].mean()) if len(vol) >= 20 else 0
+            vol_ratio = round(cur_vol / avg_vol_20, 2) if avg_vol_20 else 0
+            chg_pct = round((cur - prev) / prev * 100, 2) if prev else 0
+            info = wl.get(code, {})
+            base = {
+                "code":       code,
+                "name":       info.get("name", code),
+                "group":      info.get("group", "—"),
+                "price":      round(cur, 2),
+                "year_high":  round(year_high, 2),
+                "year_low":   round(year_low, 2),
+                "vol_ratio":  vol_ratio,
+                "change_pct": chg_pct,
+            }
+            if cur >= year_high * 0.999:
+                new_highs.append({**base, "type": "new_high"})
+            elif cur <= year_low * 1.001:
+                new_lows.append({**base, "type": "new_low"})
+            elif cur >= year_high * 0.97:
+                base["pct_from_high"] = round((cur - year_high) / year_high * 100, 2)
+                near_highs.append({**base, "type": "near_high"})
+        except Exception:
+            continue
+
+    new_highs.sort(key=lambda x: -x["vol_ratio"])
+    near_highs.sort(key=lambda x: -(x.get("pct_from_high") or -999))
+    out = {
+        "new_highs":  new_highs,
+        "new_lows":   new_lows,
+        "near_highs": near_highs[:10],
+        "as_of":      str(end.date()),
+    }
+    cache_set(cache_key, out)
+    return out
 
 
 # ============================================================================

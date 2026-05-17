@@ -87,6 +87,56 @@
     display: flex; gap: 32px; animation: scroll 60s linear infinite; white-space: nowrap;
   }
   .ticker-track:hover { animation-play-state: paused; }
+
+  /* ===== Breadth Strip ===== */
+  .breadth-strip {
+    border: 1px solid var(--line); border-radius: 12px; background: var(--bg-1);
+    padding: 8px 14px; margin-bottom: 16px;
+    display: flex; gap: 18px; align-items: center; flex-wrap: wrap;
+  }
+  .breadth-label {
+    font-size: 12px; color: var(--cyan); font-weight: 700; letter-spacing: 2px;
+    border-right: 1px solid var(--line); padding-right: 18px;
+  }
+  .breadth-cells { display: flex; gap: 14px; flex-wrap: wrap; flex: 1; }
+  .breadth-cell {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 4px 12px; border-radius: 8px;
+    min-width: 130px; font-size: 12px;
+    background: var(--bg-2); border: 1px solid var(--line);
+  }
+  .breadth-cell.calm    { border-color: var(--green); background: rgba(56,224,123,0.08); }
+  .breadth-cell.danger  { border-color: var(--red);   background: rgba(255,90,118,0.08); }
+  .breadth-cell.high    { border-color: var(--orange);background: rgba(255,165,0,0.08); }
+  .breadth-cell.low     { border-color: var(--cyan);  background: rgba(0,229,255,0.08); }
+  .breadth-cell .ml-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+  .breadth-cell .ml-value { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .breadth-cell .ml-chg   { font-size: 11px; }
+  .breadth-cell.loading   { color: var(--muted); justify-content: center; align-items: center; }
+
+  /* ===== 52w View ===== */
+  .hilo-view { display: none; }
+  .hilo-view.show { display: block; }
+  .hilo-section { margin-bottom: 18px; }
+  .hilo-section h3 { font-size: 13px; margin-bottom: 8px; letter-spacing: 1px; }
+  .hilo-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px;
+  }
+  .hilo-card {
+    background: var(--bg-1); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 14px; cursor: pointer; transition: border-color 0.2s;
+  }
+  .hilo-card:hover { border-color: var(--cyan); }
+  .hilo-card.high { border-left: 3px solid var(--green); }
+  .hilo-card.low  { border-left: 3px solid var(--red); }
+  .hilo-card.near { border-left: 3px solid var(--orange); }
+  .hilo-card .code { font-family: "SF Mono", Consolas, monospace; color: var(--yellow); font-size: 13px; font-weight: 700; }
+  .hilo-card .name { color: var(--muted); font-size: 11px; }
+  .hilo-card .row {
+    display: flex; justify-content: space-between; font-size: 11px;
+    color: var(--muted); margin-top: 4px;
+  }
+  .hilo-card .val { font-variant-numeric: tabular-nums; color: var(--text); }
   .ticker-item { font-size: 14px; }
   .ticker-item .name { color: var(--muted); margin-right: 6px; }
   @keyframes scroll {
@@ -693,6 +743,14 @@
     <div class="ticker-track" id="ticker"></div>
   </div>
 
+  <!-- ===== Breadth Strip ===== -->
+  <div class="breadth-strip" id="breadthStrip">
+    <div class="breadth-label">📐 市場寬度</div>
+    <div class="breadth-cells" id="breadthCells">
+      <div class="breadth-cell loading">⏳ 載入中…</div>
+    </div>
+  </div>
+
   <!-- ===== Toolbar (groups + add + telegram + view) ===== -->
   <div class="toolbar">
     <div class="group-chips" id="groupChips"></div>
@@ -706,6 +764,7 @@
       <div class="opt" data-view="rank">🔥 熱度榜</div>
       <div class="opt" data-view="heat">🌡 族群熱度</div>
       <div class="opt" data-view="pf">💼 我的持股</div>
+      <div class="opt" data-view="hilo">🎯 52週</div>
     </div>
   </div>
 
@@ -1115,6 +1174,18 @@
     <div class="heatmap-grid" id="heatmapGrid"></div>
   </div>
 
+  <!-- ===== 52-WEEK SCAN VIEW ===== -->
+  <div class="hilo-view" id="hiloView">
+    <div class="rank-controls">
+      <span style="color:var(--green); font-weight:700; letter-spacing:2px;">🎯 52 週新高 / 新低掃描</span>
+      <span class="spacer" style="flex:0 0 12px;"></span>
+      <span style="font-size:12px; color:var(--muted);">建立 / 跌破 / 接近新高 — 量能 ≥ 1.3x 平均更具動能</span>
+    </div>
+    <div id="hiloContent">
+      <div style="color:var(--muted);text-align:center;padding:40px;">⏳ 載入中…</div>
+    </div>
+  </div>
+
   <!-- ===== PORTFOLIO VIEW ===== -->
   <div class="portfolio-view" id="pfView">
     <div class="rank-controls">
@@ -1342,6 +1413,9 @@
     <label>🎯 訊號爆發（同時 N 個以上）</label>
     <input type="number" id="alertSignalBurst" step="1" min="2" max="6" placeholder="例 3 (留空 = 不啟用)">
 
+    <label>🩸 Drawdown 警示（從近 60d 高點回檔 N%）</label>
+    <input type="number" id="alertDrawdown" step="1" min="3" max="50" placeholder="例 8 = 從高點跌 8%">
+
     <div id="alertHint" class="hint" style="margin-top:8px;"></div>
 
     <div class="actions">
@@ -1464,6 +1538,8 @@ async function boot() {
   _bindPfSort();
   tickTime();
   setInterval(tickTime, 60000);
+  loadBreadth();
+  setInterval(loadBreadth, 300000);
 
   // 5 分鐘自動刷新
   setInterval(async () => {
@@ -1589,11 +1665,103 @@ function switchView(v) {
   document.getElementById("rankView").classList.toggle("show", v === "rank");
   document.getElementById("heatView").classList.toggle("show", v === "heat");
   document.getElementById("pfView").classList.toggle("show", v === "pf");
+  document.getElementById("hiloView").classList.toggle("show", v === "hilo");
 
   if (v === "rank")      loadRanking();
   else if (v === "heat") loadHeatmap();
   else if (v === "pf")   loadPortfolio();
+  else if (v === "hilo") loadHiLo();
   else if (state.activeCode) loadStock(state.activeCode);
+}
+
+/* =========================================================================
+ * Breadth Strip
+ * ======================================================================= */
+async function loadBreadth() {
+  const el = document.getElementById("breadthCells");
+  try {
+    const b = await apiGet("/api/breadth", 60000);
+    const cls50  = b.pct_above_50  >= 70 ? "calm" : b.pct_above_50  >= 50 ? "" : b.pct_above_50  < 30 ? "danger" : "low";
+    const cls200 = b.pct_above_200 >= 60 ? "calm" : b.pct_above_200 >= 40 ? "" : "danger";
+    const ad = b.ad_ratio;
+    const adCls = ad >= 2 ? "calm" : ad >= 1 ? "" : "danger";
+    const statusIcons = {strong:"🟢", healthy:"🟢", neutral:"⚪", divergence:"🟠", weak:"🔴"};
+    const ic = statusIcons[b.status] || "⚪";
+    const twiiVs56 = b.spy_vs_rsp;  // 後端用 spy_vs_rsp 但其實是 ^TWII vs 0056
+    const svrCls = twiiVs56 == null ? "" : twiiVs56 > 0.5 ? "high" : twiiVs56 < -0.5 ? "low" : "";
+    el.innerHTML = `
+      <div class="breadth-cell ${cls50}" title="watchlist 中股價 > 20 日均線的%">
+        <span class="ml-label">${ic} > 20MA</span>
+        <span class="ml-value">${b.pct_above_50}%</span>
+        <span class="ml-chg" style="color:var(--muted);">${b.advancers}↑ / ${b.decliners}↓ 今日</span>
+      </div>
+      <div class="breadth-cell ${cls200}" title="watchlist 中股價 > 60 日均線的%">
+        <span class="ml-label">📊 > 60MA</span>
+        <span class="ml-value">${b.pct_above_200}%</span>
+        <span class="ml-chg" style="color:var(--muted);">${b.bull_trend} 多 / ${b.bear_trend} 空 趨勢</span>
+      </div>
+      <div class="breadth-cell ${adCls}" title="advancers / decliners 漲家數比">
+        <span class="ml-label">⚖️ A/D</span>
+        <span class="ml-value">${ad}</span>
+        <span class="ml-chg" style="color:var(--muted);">${b.note || '—'}</span>
+      </div>
+      ${twiiVs56 != null ? `
+      <div class="breadth-cell ${svrCls}" title="^TWII 漲跌 - 0056 漲跌. 正 = 權值股拉,負 = 中型股拉">
+        <span class="ml-label">🐋 TWII - 0056</span>
+        <span class="ml-value">${twiiVs56 >= 0 ? '+' : ''}${twiiVs56}%</span>
+        <span class="ml-chg" style="color:var(--muted);">TWII ${b.spy_change >= 0 ? '+' : ''}${b.spy_change}% · 0056 ${b.rsp_change >= 0 ? '+' : ''}${b.rsp_change}%</span>
+      </div>` : ''}
+    `;
+  } catch (e) {
+    el.innerHTML = `<div class="breadth-cell loading" style="color:var(--red);">⚠️ ${e.message}</div>`;
+  }
+}
+
+/* =========================================================================
+ * 52-Week Scanner
+ * ======================================================================= */
+async function loadHiLo() {
+  const el = document.getElementById("hiloContent");
+  el.innerHTML = `<div style="color:var(--muted);text-align:center;padding:40px;">⏳ 載入中 (首次抓 400 日歷史約 20-40 秒)…</div>`;
+  try {
+    const d = await apiGet("/api/52w-scan", 90000);
+    const card = (r, cls) => `
+      <div class="hilo-card ${cls}" data-code="${r.code}">
+        <div class="code">${r.code}</div>
+        <div class="name">${r.name} · ${r.group}</div>
+        <div class="row"><span>現價</span><span class="val">${r.price}</span></div>
+        ${r.pct_from_high != null ? `<div class="row"><span>距高點</span><span class="val" style="color:var(--orange);">${r.pct_from_high}%</span></div>` : ''}
+        <div class="row"><span>今日</span><span class="val" style="color:${r.change_pct >= 0 ? 'var(--red)' : 'var(--green)'};">${r.change_pct >= 0 ? '+' : ''}${r.change_pct}%</span></div>
+        <div class="row"><span>量比</span><span class="val" style="color:${r.vol_ratio >= 1.5 ? 'var(--red)' : r.vol_ratio >= 1.2 ? 'var(--orange)' : 'var(--muted)'};">${r.vol_ratio}x</span></div>
+        <div class="row"><span>52W</span><span class="val">${r.year_low} - ${r.year_high}</span></div>
+      </div>`;
+    const hi = (d.new_highs  || []).map(r => card(r, "high")).join("");
+    const lo = (d.new_lows   || []).map(r => card(r, "low")).join("");
+    const nr = (d.near_highs || []).map(r => card(r, "near")).join("");
+    el.innerHTML = `
+      <div class="hilo-section">
+        <h3 style="color:var(--green);">📈 創 52 週新高 (${(d.new_highs || []).length} 檔)</h3>
+        <div class="hilo-grid">${hi || '<div style="color:var(--muted);">無</div>'}</div>
+      </div>
+      <div class="hilo-section">
+        <h3 style="color:var(--orange);">🎯 接近新高 (3% 內,${(d.near_highs || []).length} 檔)</h3>
+        <div class="hilo-grid">${nr || '<div style="color:var(--muted);">無</div>'}</div>
+      </div>
+      <div class="hilo-section">
+        <h3 style="color:var(--red);">📉 創 52 週新低 (${(d.new_lows || []).length} 檔)</h3>
+        <div class="hilo-grid">${lo || '<div style="color:var(--muted);">無</div>'}</div>
+      </div>
+    `;
+    el.querySelectorAll(".hilo-card").forEach(c => {
+      c.addEventListener("click", () => {
+        state.activeCode = c.dataset.code;
+        switchView("stock");
+        loadStock(state.activeCode);
+      });
+    });
+  } catch (e) {
+    el.innerHTML = `<div style="color:var(--red);text-align:center;padding:40px;">⚠️ ${e.message}</div>`;
+  }
 }
 
 /* =========================================================================
@@ -2282,6 +2450,7 @@ const _ALERT_FIELDS = [
   ["alertBreakout",    "on_breakout",     "bool"],
   ["alertBreakdown",   "on_breakdown",    "bool"],
   ["alertSignalBurst", "on_signal_burst", "num"],
+  ["alertDrawdown",    "drawdown_pct",    "num"],
 ];
 async function openAlertModal() {
   if (!state.activeCode) return;
@@ -2309,6 +2478,7 @@ async function openAlertModal() {
       if (cur.rsi_below != null) summary.push(`RSI≤${cur.rsi_below}`);
       if (cur.on_golden_cross) summary.push("黃金交叉");
       if (cur.on_signal_burst) summary.push(`訊號≥${cur.on_signal_burst}`);
+      if (cur.drawdown_pct != null) summary.push(`回檔≥${cur.drawdown_pct}%`);
       document.getElementById("alertHint").innerHTML = `現有警示：${summary.join(" · ") || "無"}`;
     }
     const tg = await apiGet("/api/telegram");
