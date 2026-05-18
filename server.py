@@ -33,9 +33,12 @@ from pydantic import BaseModel
 
 ROOT = Path(__file__).resolve().parent
 WATCHLIST_FILE = ROOT / "watchlist.json"
-ALERTS_FILE    = ROOT / "alerts.json"
-TELEGRAM_FILE  = ROOT / "telegram.json"
-PORTFOLIO_FILE = ROOT / "portfolio.json"
+ALERTS_FILE         = ROOT / "alerts.json"
+ALERTS_LOG_FILE     = ROOT / "alerts_log.json"
+TELEGRAM_FILE       = ROOT / "telegram.json"
+PORTFOLIO_FILE      = ROOT / "portfolio.json"
+REBALANCE_TARGET_FILE = ROOT / "rebalance_target.json"
+GROUP_ALERTS_FILE   = ROOT / "group_alerts.json"
 GEMINI_FILE    = ROOT / "gemini.json"
 
 # ----------------------------------------------------------------------------
@@ -807,11 +810,40 @@ def check_alert(code: str, price: float, prev: float, name: str = "",
     save_json(ALERTS_FILE, alerts)
     for msg in triggered:
         send_telegram(msg)
+        _append_alert_log(code, name, price, msg)
+
+
+def _append_alert_log(code: str, name: str, price: float, msg: str) -> None:
+    """把觸發的警示寫到 alerts_log.json,給「警示回顧」用。"""
+    try:
+        log = load_json(ALERTS_LOG_FILE, [])
+        kind = "price"
+        for prefix, k in [("🚀", "breakout_up"), ("⚠️ ", "breakdown_below"),
+                          ("🔥", "rsi_overbought"), ("❄️", "rsi_oversold"),
+                          ("🌟", "golden_cross"), ("💀", "death_cross"),
+                          ("🔼", "kd_up"), ("📉", "breakdown_low"),
+                          ("🎯", "signal_burst"), ("🩸", "drawdown")]:
+            if msg.startswith(prefix):
+                kind = k; break
+        log.append({
+            "ts":    time.time(),
+            "code":  code,
+            "name":  name,
+            "price": float(price),
+            "kind":  kind,
+            "msg":   msg[:200],
+        })
+        if len(log) > 500:
+            log = log[-500:]
+        save_json(ALERTS_LOG_FILE, log)
+    except Exception as e:
+        print(f"[alert_log] {e}")
 
 
 def alert_worker():
-    """背景每 5 分鐘掃描有設警示的股票。"""
+    """背景每 5 分鐘掃描有設警示的股票 + 每天掃族群輪動。"""
     print("[alert_worker] 啟動，每 5 分鐘檢查一次")
+    last_group_scan = 0
     while True:
         time.sleep(300)
         try:
@@ -824,8 +856,60 @@ def alert_worker():
                     fetch_stock(code, force=True)  # 內部會 check_alert
                 except Exception as e:
                     print(f"[alert_worker] {code}: {e}")
+            # 每 24h 掃一次族群輪動 alert
+            if time.time() - last_group_scan > 86400:
+                try:
+                    _scan_group_alerts()
+                except Exception as e:
+                    print(f"[alert_worker group] {e}")
+                last_group_scan = time.time()
         except Exception as e:
             print(f"[alert_worker] {e}")
+
+
+def _scan_group_alerts():
+    """每日掃描族群輪動,達閾值就推 Telegram。
+    group_alerts.json:
+    {"groups": {"半導體設備": {"ret_1w_above": 5}, ...},
+     "_last_pushed": {key: ts}}
+    """
+    cfg = load_json(GROUP_ALERTS_FILE, {})
+    rules = cfg.get("groups", {})
+    if not rules:
+        return
+    last_pushed = cfg.get("_last_pushed", {})
+    now_ts = time.time()
+    msgs = []
+    try:
+        data = api_group_rotation()
+    except Exception as e:
+        print(f"[group_alert] rotation fail: {e}")
+        return
+    for grp, thresholds in rules.items():
+        cur = next((x for x in data if x.get("group") == grp), None)
+        if not cur: continue
+        for rule, threshold in thresholds.items():
+            parts = rule.rsplit("_", 1)
+            if len(parts) != 2: continue
+            metric, direction = parts
+            v = cur.get(metric)
+            if v is None: continue
+            trig = (direction == "above" and v >= threshold) or \
+                   (direction == "below" and v <= threshold)
+            if not trig: continue
+            dedup_key = f"{grp}:{rule}:{threshold}"
+            if now_ts - last_pushed.get(dedup_key, 0) < 86400:
+                continue
+            arrow = "🚀" if direction == "above" else "⚠️"
+            msgs.append(f"{arrow} *族群 {grp}* — {metric} = *{v:+.2f}%* "
+                       f"(觸發: {'≥' if direction == 'above' else '≤'} {threshold}%)")
+            last_pushed[dedup_key] = now_ts
+    if msgs:
+        for m in msgs:
+            send_telegram(m)
+        cfg["_last_pushed"] = last_pushed
+        save_json(GROUP_ALERTS_FILE, cfg)
+        print(f"[group alert] 推送 {len(msgs)} 則")
 
 
 # ----------------------------------------------------------------------------
@@ -2035,6 +2119,245 @@ def api_52w_scan():
     }
     cache_set(cache_key, out)
     return out
+
+
+# ============================================================================
+# 警示觸發紀錄 — 過去 N 天 + 每筆後續走勢
+# ============================================================================
+@app.get("/api/alerts-log")
+def api_alerts_log(days: int = 30):
+    """過去 N 天觸發的警示 + 每筆 1d/5d/20d 後續走勢回顧。"""
+    cache_key = f"alerts_log:{days}"
+    cached = cache_get(cache_key)
+    if cached:
+        return cached
+    log = load_json(ALERTS_LOG_FILE, [])
+    if not log:
+        return {"entries": [], "stats": {}, "asOf": str(pd.Timestamp.today().date())}
+    cutoff_ts = time.time() - days * 86400
+    recent = [e for e in log if e.get("ts", 0) >= cutoff_ts]
+    if not recent:
+        return {"entries": [], "stats": {}, "asOf": str(pd.Timestamp.today().date())}
+
+    wl = load_watchlist()
+    codes = sorted({e["code"] for e in recent if e["code"] in wl})
+    yf_codes = [wl[c]["yf"] for c in codes]
+    end = pd.Timestamp.today()
+    start = end - pd.Timedelta(days=days + 60)
+    closes = {}
+    if yf_codes:
+        try:
+            data = yf.download(yf_codes, start=start, end=end, auto_adjust=False,
+                               progress=False, group_by="ticker", threads=True)
+            for c, yfc in zip(codes, yf_codes):
+                try:
+                    closes[c] = data[yfc]["Close"].dropna() if len(yf_codes) > 1 else data["Close"].dropna()
+                except Exception:
+                    continue
+        except Exception as e:
+            print(f"[alerts_log yf] {e}")
+
+    out_entries = []
+    for e in reversed(recent):
+        c = e["code"]
+        trigger_price = float(e.get("price", 0))
+        ts = e.get("ts", 0)
+        dt = pd.Timestamp(ts, unit="s")
+        ret_1d = ret_5d = ret_20d = None
+        c_series = closes.get(c)
+        if c_series is not None and len(c_series) > 0:
+            try:
+                after = c_series[c_series.index >= dt.tz_localize(None) if c_series.index.tz else c_series.index >= dt]
+                if len(after) >= 2:
+                    ret_1d = round((float(after.iloc[1]) - trigger_price) / trigger_price * 100, 2) if trigger_price else None
+                if len(after) >= 6:
+                    ret_5d = round((float(after.iloc[5]) - trigger_price) / trigger_price * 100, 2) if trigger_price else None
+                if len(after) >= 21:
+                    ret_20d = round((float(after.iloc[20]) - trigger_price) / trigger_price * 100, 2) if trigger_price else None
+            except Exception:
+                pass
+        out_entries.append({
+            "ts": int(ts), "date": dt.strftime("%Y-%m-%d %H:%M"),
+            "code": c, "name": e.get("name", c), "price": trigger_price,
+            "kind": e.get("kind", "—"), "msg": e.get("msg", ""),
+            "ret_1d": ret_1d, "ret_5d": ret_5d, "ret_20d": ret_20d,
+        })
+
+    stats = {}
+    for k in {x["kind"] for x in out_entries}:
+        same = [x for x in out_entries if x["kind"] == k]
+        wins_5d = sum(1 for x in same if x["ret_5d"] is not None and x["ret_5d"] > 0)
+        with_5d = sum(1 for x in same if x["ret_5d"] is not None)
+        avg_5d = round(sum(x["ret_5d"] for x in same if x["ret_5d"] is not None) / with_5d, 2) if with_5d else None
+        stats[k] = {
+            "n": len(same),
+            "win_rate_5d": round(wins_5d / with_5d * 100, 1) if with_5d else None,
+            "avg_5d": avg_5d,
+        }
+
+    result = {"entries": out_entries, "stats": stats, "asOf": str(end.date())}
+    cache_set(cache_key, result)
+    return result
+
+
+# ============================================================================
+# 投組 Drawdown 曲線
+# ============================================================================
+@app.get("/api/portfolio/drawdown-curve")
+def api_portfolio_drawdown(days: int = 60):
+    """每檔近 N 天從滾動高點 drawdown %。"""
+    cache_key = f"pf_dd:{days}"
+    cached = cache_get(cache_key)
+    if cached:
+        return cached
+    p = load_portfolio()
+    if not p:
+        return {"holdings": [], "asOf": str(pd.Timestamp.today().date())}
+    wl = load_watchlist()
+    seen = {}
+    for h in p:
+        c = h.get("code")
+        if c and c not in seen and c in wl:
+            seen[c] = wl[c]["yf"]
+    codes = list(seen.keys())
+    yf_codes = [seen[c] for c in codes]
+    end = pd.Timestamp.today()
+    start = end - pd.Timedelta(days=days + 10)
+    try:
+        data = yf.download(yf_codes, start=start, end=end, auto_adjust=False,
+                           progress=False, group_by="ticker", threads=True)
+    except Exception as e:
+        raise HTTPException(503, f"yfinance fail: {e}")
+
+    out_holdings = []
+    for c, yfc in zip(codes, yf_codes):
+        try:
+            close = data[yfc]["Close"].dropna() if len(yf_codes) > 1 else data["Close"].dropna()
+            if len(close) < 5: continue
+            close = close.iloc[-days:]
+            rolling_max = close.cummax()
+            dd_pct = ((close - rolling_max) / rolling_max * 100)
+            cur_dd = float(dd_pct.iloc[-1]); max_dd = float(dd_pct.min())
+            series = [{"date": str(idx.date()), "price": round(float(p), 2),
+                       "peak": round(float(rolling_max.iloc[i]), 2),
+                       "dd_pct": round(float(dd_pct.iloc[i]), 2)}
+                      for i, (idx, p) in enumerate(close.items())]
+            out_holdings.append({
+                "code": c, "name": wl.get(c, {}).get("name", c),
+                "group": wl.get(c, {}).get("group", "—"),
+                "cur_dd": round(cur_dd, 2), "max_dd": round(max_dd, 2),
+                "current_price": round(float(close.iloc[-1]), 2),
+                "peak_price": round(float(rolling_max.iloc[-1]), 2),
+                "series": series[-30:],
+            })
+        except Exception:
+            continue
+    out_holdings.sort(key=lambda x: x["cur_dd"])
+    result = {"holdings": out_holdings, "asOf": str(end.date()), "days": days}
+    cache_set(cache_key, result)
+    return result
+
+
+# ============================================================================
+# 投組再平衡建議
+# ============================================================================
+@app.get("/api/portfolio/rebalance")
+def api_portfolio_rebalance(by: str = "group"):
+    """依 group/code 目標權重算再平衡動作。"""
+    target_cfg = load_json(REBALANCE_TARGET_FILE, {})
+    p = load_portfolio()
+    if not p:
+        return {"holdings": [], "actions": [], "by": by, "total_value": 0,
+                "warnings": ["無持股資料"]}
+    wl = load_watchlist()
+    holdings_value = {}
+    holdings_info = {}
+    total_value = 0.0
+    for h in p:
+        c = h.get("code")
+        if not c: continue
+        try:
+            s = fetch_summary(c)
+            price = float(s["price"])
+        except Exception:
+            price = float(h.get("cost_price", 0))
+        shares = float(h.get("shares", 0))
+        v = shares * price
+        holdings_value[c] = holdings_value.get(c, 0) + v
+        holdings_info[c] = {
+            "name": wl.get(c, {}).get("name", c),
+            "group": wl.get(c, {}).get("group", "—"),
+            "price": price,
+        }
+        total_value += v
+    if total_value <= 0:
+        return {"holdings": [], "actions": [], "by": by, "total_value": 0,
+                "warnings": ["持股總市值為 0"]}
+    current = {}
+    for c, v in holdings_value.items():
+        if by == "code":
+            current[c] = v
+        else:
+            g = holdings_info[c]["group"]
+            current[g] = current.get(g, 0) + v
+    target_pct = target_cfg.get(by, {})
+    using_default = False
+    if not target_pct:
+        target_pct = {k: v / total_value * 100 for k, v in current.items()}
+        using_default = True
+    s = sum(target_pct.values())
+    if s > 0 and abs(s - 100) > 0.5:
+        target_pct = {k: v / s * 100 for k, v in target_pct.items()}
+    actions = []
+    for k in set(current.keys()) | set(target_pct.keys()):
+        cur_v = current.get(k, 0)
+        cur_pct = cur_v / total_value * 100
+        tgt_pct = target_pct.get(k, 0)
+        delta_pct = tgt_pct - cur_pct
+        if abs(delta_pct) < 0.5:
+            continue
+        actions.append({
+            "key": k, "current_pct": round(cur_pct, 2),
+            "target_pct": round(tgt_pct, 2), "delta_pct": round(delta_pct, 2),
+            "delta_value": round(total_value * delta_pct / 100, 2),
+            "action": "買" if delta_pct > 0 else "賣",
+        })
+    actions.sort(key=lambda x: -abs(x["delta_pct"]))
+    return {
+        "by": by, "total_value": round(total_value, 2),
+        "current": {k: round(v / total_value * 100, 2) for k, v in current.items()},
+        "target": {k: round(v, 2) for k, v in target_pct.items()},
+        "actions": actions, "using_default_target": using_default,
+        "warnings": ["未設目標,目前用「維持現狀」為目標。可編輯 rebalance_target.json"]
+                    if using_default else [],
+        "asOf": str(pd.Timestamp.today().date()),
+    }
+
+
+@app.post("/api/portfolio/rebalance-target")
+def api_set_rebalance_target(target: dict):
+    cur = load_json(REBALANCE_TARGET_FILE, {})
+    for k, v in (target or {}).items():
+        cur[k] = v
+    save_json(REBALANCE_TARGET_FILE, cur)
+    return {"ok": True, "target": cur}
+
+
+# ============================================================================
+# 族群 alert 設定
+# ============================================================================
+@app.get("/api/group-alerts")
+def api_get_group_alerts():
+    return load_json(GROUP_ALERTS_FILE, {"groups": {}})
+
+
+@app.post("/api/group-alerts")
+def api_set_group_alerts(cfg: dict):
+    """payload: {"groups": {"半導體設備": {"ret_1w_above": 5, "momentum_below": -3}}}"""
+    existing = load_json(GROUP_ALERTS_FILE, {})
+    existing["groups"] = cfg.get("groups", existing.get("groups", {}))
+    save_json(GROUP_ALERTS_FILE, existing)
+    return {"ok": True}
 
 
 # ============================================================================
