@@ -44,77 +44,147 @@ GEMINI_FILE    = ROOT / "gemini.json"
 # ----------------------------------------------------------------------------
 # Default watchlist (首次啟動時寫入 watchlist.json)
 # ----------------------------------------------------------------------------
-DEFAULT_WATCHLIST: dict[str, dict[str, str]] = {
-    # 1. 晶圓代工 (Foundry)
-    "2330": {"name": "台積電",   "tag": "晶圓代工 · 先進製程",       "yf": "2330.TW",  "group": "晶圓代工"},
+DEFAULT_WATCHLIST: dict[str, dict[str, Any]] = {
+    # 1. 晶圓代工
+    "2330": {"name": "台積電",   "tag": "晶圓代工 · 先進製程",       "yf": "2330.TW",  "group": "晶圓代工",
+             "themes": ["AI 加速器", "半導體代工", "CoWoS / 先進封裝"]},
 
-    # 2. IC 設計 (含 IP)
-    "2454": {"name": "聯發科",   "tag": "IC 設計 · 手機 SoC",        "yf": "2454.TW",  "group": "IC 設計"},
-    "3661": {"name": "世芯-KY",  "tag": "IP / ASIC 設計服務",        "yf": "3661.TW",  "group": "IP / 矽智財"},
+    # 2. IC 設計
+    "2454": {"name": "聯發科",   "tag": "IC 設計 · 手機 SoC",        "yf": "2454.TW",  "group": "IC 設計",
+             "themes": ["Fabless IC"]},
+    "3661": {"name": "世芯-KY",  "tag": "IP / ASIC 設計服務",        "yf": "3661.TW",  "group": "IP / 矽智財",
+             "themes": ["AI 加速器", "Fabless IC"]},
 
-    # 3. 探針卡 / 封測 (含 Image 2 帶出的封測領導股)
-    "3711": {"name": "日月光投控","tag": "封測 · 全球龍頭",            "yf": "3711.TW",  "group": "封測"},
-    "2449": {"name": "京元電",   "tag": "封測 · 測試",               "yf": "2449.TW",  "group": "封測"},
-    "6515": {"name": "穎崴",     "tag": "封測 · 測試介面",            "yf": "6515.TW",  "group": "封測"},
-    "6223": {"name": "旺矽",     "tag": "封測 · 探針卡",             "yf": "6223.TWO", "group": "封測"},
-    "6510": {"name": "精測",     "tag": "封測 · 探針卡",             "yf": "6510.TWO", "group": "封測"},
-    "6217": {"name": "中探針",   "tag": "封測 · 探針卡",             "yf": "6217.TWO", "group": "封測"},
-    "6147": {"name": "頎邦",     "tag": "封測 · 驅動 IC",            "yf": "6147.TWO", "group": "封測"},
+    # 3. 封測
+    "3711": {"name": "日月光投控","tag": "封測 · 全球龍頭",            "yf": "3711.TW",  "group": "封測",
+             "themes": ["CoWoS / 先進封裝"]},
+    "2449": {"name": "京元電",   "tag": "封測 · 測試",               "yf": "2449.TW",  "group": "封測", "themes": []},
+    "6515": {"name": "穎崴",     "tag": "封測 · 測試介面",            "yf": "6515.TW",  "group": "封測", "themes": []},
+    "6223": {"name": "旺矽",     "tag": "封測 · 探針卡",             "yf": "6223.TWO", "group": "封測", "themes": []},
+    "6510": {"name": "精測",     "tag": "封測 · 探針卡",             "yf": "6510.TWO", "group": "封測", "themes": []},
+    "6217": {"name": "中探針",   "tag": "封測 · 探針卡",             "yf": "6217.TWO", "group": "封測", "themes": []},
+    "6147": {"name": "頎邦",     "tag": "封測 · 驅動 IC",            "yf": "6147.TWO", "group": "封測", "themes": []},
 
-    # 4. 先進封裝設備 (CoWoS)
-    "6187": {"name": "萬潤",     "tag": "先進封裝設備 (CoWoS)",       "yf": "6187.TWO", "group": "先進封裝"},
-    "3131": {"name": "弘塑",     "tag": "先進封裝設備 · 清洗",       "yf": "3131.TWO", "group": "先進封裝"},
-    "7734": {"name": "印能科技", "tag": "半導體 · 烘烤製程設備",     "yf": "7734.TWO", "group": "先進封裝"},
-    "8027": {"name": "鈦昇",     "tag": "IC 封裝設備",               "yf": "8027.TWO", "group": "先進封裝"},
+    # 4. 先進封裝
+    "6187": {"name": "萬潤",     "tag": "先進封裝設備 (CoWoS)",       "yf": "6187.TWO", "group": "先進封裝",
+             "themes": ["CoWoS / 先進封裝"]},
+    "3131": {"name": "弘塑",     "tag": "先進封裝設備 · 清洗",       "yf": "3131.TWO", "group": "先進封裝",
+             "themes": ["CoWoS / 先進封裝"]},
+    "7734": {"name": "印能科技", "tag": "半導體 · 烘烤製程設備",     "yf": "7734.TWO", "group": "先進封裝",
+             "themes": ["CoWoS / 先進封裝"]},
+    "8027": {"name": "鈦昇",     "tag": "IC 封裝設備",               "yf": "8027.TWO", "group": "先進封裝",
+             "themes": ["CoWoS / 先進封裝"]},
 
-    # 5. 矽晶圓 / 上游材料
-    "3532": {"name": "台勝科",   "tag": "矽晶圓 · 磊晶",             "yf": "3532.TW",  "group": "矽晶圓"},
-    "6488": {"name": "環球晶",   "tag": "矽晶圓 · 全球前段",         "yf": "6488.TWO", "group": "矽晶圓"},
+    # 5. 矽晶圓
+    "3532": {"name": "台勝科",   "tag": "矽晶圓 · 磊晶",             "yf": "3532.TW",  "group": "矽晶圓", "themes": []},
+    "6488": {"name": "環球晶",   "tag": "矽晶圓 · 全球前段",         "yf": "6488.TWO", "group": "矽晶圓", "themes": []},
 
-    # 6. ABF 載板 (三劍客)
-    "8046": {"name": "南電",     "tag": "ABF 載板",                   "yf": "8046.TW",  "group": "ABF 載板"},
-    "3189": {"name": "景碩",     "tag": "ABF 載板",                   "yf": "3189.TW",  "group": "ABF 載板"},
-    "3037": {"name": "欣興",     "tag": "ABF 載板",                   "yf": "3037.TW",  "group": "ABF 載板"},
+    # 6. ABF 載板
+    "8046": {"name": "南電",     "tag": "ABF 載板",                   "yf": "8046.TW",  "group": "ABF 載板",
+             "themes": ["AI 加速器"]},
+    "3189": {"name": "景碩",     "tag": "ABF 載板",                   "yf": "3189.TW",  "group": "ABF 載板",
+             "themes": ["AI 加速器"]},
+    "3037": {"name": "欣興",     "tag": "ABF 載板",                   "yf": "3037.TW",  "group": "ABF 載板",
+             "themes": ["AI 加速器"]},
 
     # 7. 高速 CCL / PCB
-    "2383": {"name": "台光電",   "tag": "高速銅箔基板 (CCL)",         "yf": "2383.TW",  "group": "高速 CCL"},
-    "4958": {"name": "臻鼎-KY",  "tag": "PCB / 軟板",                 "yf": "4958.TW",  "group": "PCB / 軟板"},
+    "2383": {"name": "台光電",   "tag": "高速銅箔基板 (CCL)",         "yf": "2383.TW",  "group": "高速 CCL",
+             "themes": ["AI 加速器", "Server 高速傳輸"]},
+    "4958": {"name": "臻鼎-KY",  "tag": "PCB / 軟板",                 "yf": "4958.TW",  "group": "PCB / 軟板",
+             "themes": []},
 
-    # 8. 矽光子 / CPO 光通訊
-    "6442": {"name": "光聖",     "tag": "光通訊 · 主動光纜",          "yf": "6442.TW",  "group": "矽光子 / CPO"},
-    "4979": {"name": "華星光",   "tag": "光通訊 · 光收發",            "yf": "4979.TWO", "group": "矽光子 / CPO"},
-    "6451": {"name": "訊芯-KY",  "tag": "光通訊 · CPO 模組",          "yf": "6451.TW",  "group": "矽光子 / CPO"},
-    "3163": {"name": "波若威",   "tag": "光通訊 · 矽光子",            "yf": "3163.TWO", "group": "矽光子 / CPO"},
-    "3081": {"name": "聯亞",     "tag": "光通訊 · 雷射晶粒",          "yf": "3081.TWO", "group": "矽光子 / CPO"},
+    # 8. 矽光子 / CPO
+    "6442": {"name": "光聖",     "tag": "光通訊 · 主動光纜",          "yf": "6442.TW",  "group": "矽光子 / CPO",
+             "themes": ["光通訊 / CPO", "AI 模型基建"]},
+    "4979": {"name": "華星光",   "tag": "光通訊 · 光收發",            "yf": "4979.TWO", "group": "矽光子 / CPO",
+             "themes": ["光通訊 / CPO", "AI 模型基建"]},
+    "6451": {"name": "訊芯-KY",  "tag": "光通訊 · CPO 模組",          "yf": "6451.TW",  "group": "矽光子 / CPO",
+             "themes": ["光通訊 / CPO", "AI 模型基建"]},
+    "3163": {"name": "波若威",   "tag": "光通訊 · 矽光子",            "yf": "3163.TWO", "group": "矽光子 / CPO",
+             "themes": ["光通訊 / CPO"]},
+    "3081": {"name": "聯亞",     "tag": "光通訊 · 雷射晶粒",          "yf": "3081.TWO", "group": "矽光子 / CPO",
+             "themes": ["光通訊 / CPO"]},
 
-    # 9. 伺服器代工 (ODM)
-    "2317": {"name": "鴻海",     "tag": "伺服器代工 · ODM",           "yf": "2317.TW",  "group": "伺服器 ODM"},
-    "6669": {"name": "緯穎",     "tag": "AI 伺服器代工",              "yf": "6669.TW",  "group": "伺服器 ODM"},
+    # 9. 伺服器 ODM
+    "2317": {"name": "鴻海",     "tag": "伺服器代工 · ODM",           "yf": "2317.TW",  "group": "伺服器 ODM",
+             "themes": ["AI 伺服器"]},
+    "6669": {"name": "緯穎",     "tag": "AI 伺服器代工",              "yf": "6669.TW",  "group": "伺服器 ODM",
+             "themes": ["AI 伺服器", "AI 模型基建"]},
 
     # 10. 散熱模組
-    "3017": {"name": "奇鋐",     "tag": "散熱模組 · 液冷",            "yf": "3017.TW",  "group": "散熱模組"},
-    "3324": {"name": "雙鴻",     "tag": "散熱模組",                   "yf": "3324.TW",  "group": "散熱模組"},
+    "3017": {"name": "奇鋐",     "tag": "散熱模組 · 液冷",            "yf": "3017.TW",  "group": "散熱模組",
+             "themes": ["AI 資料中心電力", "AI 伺服器"]},
+    "3324": {"name": "雙鴻",     "tag": "散熱模組",                   "yf": "3324.TW",  "group": "散熱模組",
+             "themes": ["AI 資料中心電力", "AI 伺服器"]},
 
-    # 11. 電源管理 / BBU 備援電池
-    "2308": {"name": "台達電",   "tag": "電源管理 · AI 電源",         "yf": "2308.TW",  "group": "電源 / BBU"},
-    "6121": {"name": "新普",     "tag": "BBU 備援電池",               "yf": "6121.TWO", "group": "電源 / BBU"},
+    # 11. 電源 / BBU
+    "2308": {"name": "台達電",   "tag": "電源管理 · AI 電源",         "yf": "2308.TW",  "group": "電源 / BBU",
+             "themes": ["AI 資料中心電力", "AI 伺服器"]},
+    "6121": {"name": "新普",     "tag": "BBU 備援電池",               "yf": "6121.TWO", "group": "電源 / BBU",
+             "themes": ["AI 資料中心電力"]},
 
-    # 12. BMC 伺服器管理晶片
-    "5274": {"name": "信驊",     "tag": "BMC 伺服器管理晶片",         "yf": "5274.TW",  "group": "BMC / 周邊"},
+    # 12. BMC / 周邊
+    "5274": {"name": "信驊",     "tag": "BMC 伺服器管理晶片",         "yf": "5274.TW",  "group": "BMC / 周邊",
+             "themes": ["AI 伺服器", "Fabless IC"]},
 
-    # === AI 價值鏈往上層 (應用/模型/能源) ===
-    # 13. 機器人 / AI 應用 (蛋糕第 5 層)
-    "2395": {"name": "研華",     "tag": "工業電腦 · 邊緣 AI",         "yf": "2395.TW",  "group": "機器人 / AI 應用"},
-    "8210": {"name": "所羅門",   "tag": "AI 機器視覺 / 自動化",       "yf": "8210.TW",  "group": "機器人 / AI 應用"},
-    "4938": {"name": "和碩",     "tag": "代工 · 機器人 / AI 終端",    "yf": "4938.TW",  "group": "機器人 / AI 應用"},
+    # 13. 機器人 / AI 應用
+    "2395": {"name": "研華",     "tag": "工業電腦 · 邊緣 AI",         "yf": "2395.TW",  "group": "機器人 / AI 應用",
+             "themes": ["AI 應用"]},
+    "8210": {"name": "所羅門",   "tag": "AI 機器視覺 / 自動化",       "yf": "8210.TW",  "group": "機器人 / AI 應用",
+             "themes": ["AI 應用"]},
+    "4938": {"name": "和碩",     "tag": "代工 · 機器人 / AI 終端",    "yf": "4938.TW",  "group": "機器人 / AI 應用",
+             "themes": ["AI 應用"]},
 
-    # 14. AI 模型 / 主權 AI (蛋糕第 4 層)
-    "6770": {"name": "力積電",   "tag": "晶圓代工 · 主權 AI 合作",    "yf": "6770.TW",  "group": "AI 模型 / 主權 AI"},
+    # 14. AI 模型 / 主權 AI
+    "6770": {"name": "力積電",   "tag": "晶圓代工 · 主權 AI 合作",    "yf": "6770.TW",  "group": "AI 模型 / 主權 AI",
+             "themes": ["半導體代工"]},
 
-    # 15. 重電 / 電網 (蛋糕第 1 層 — AI 電力基礎)
-    "1519": {"name": "華城",     "tag": "重電 · 大型變壓器",          "yf": "1519.TW",  "group": "重電 / 電網"},
-    "1513": {"name": "中興電",   "tag": "重電 · 配電盤 / 開關",       "yf": "1513.TW",  "group": "重電 / 電網"},
-    "1503": {"name": "士電",     "tag": "重電 · 變壓器 / 配電",       "yf": "1503.TW",  "group": "重電 / 電網"},
+    # 15. 重電 / 電網
+    "1519": {"name": "華城",     "tag": "重電 · 大型變壓器",          "yf": "1519.TW",  "group": "重電 / 電網",
+             "themes": ["AI 資料中心電力"]},
+    "1513": {"name": "中興電",   "tag": "重電 · 配電盤 / 開關",       "yf": "1513.TW",  "group": "重電 / 電網",
+             "themes": ["AI 資料中心電力"]},
+    "1503": {"name": "士電",     "tag": "重電 · 變壓器 / 配電",       "yf": "1503.TW",  "group": "重電 / 電網",
+             "themes": ["AI 資料中心電力"]},
+
+    # === 被動元件 (Passive Components) — 完整供應鏈 ===
+    # 16. 電阻
+    "2478": {"name": "大毅",     "tag": "厚膜晶片電阻 · 全球第二",    "yf": "2478.TW",  "group": "電阻",
+             "themes": ["被動元件", "車用電子"]},
+    "3624": {"name": "光頡",     "tag": "薄膜+厚膜雙製程 · 高頻電阻", "yf": "3624.TWO", "group": "電阻",
+             "themes": ["被動元件", "AI 模型基建", "5G / 高頻"]},
+
+    # 17. 電容 (MLCC + 鉭電容)
+    "2327": {"name": "國巨",     "tag": "被動元件龍頭 · MLCC/鉭電容", "yf": "2327.TW",  "group": "被動元件",
+             "themes": ["被動元件", "車用電子", "AI 模型基建"]},
+    "2492": {"name": "華新科",   "tag": "MLCC + 電阻 · AI/車用",      "yf": "2492.TW",  "group": "被動元件",
+             "themes": ["被動元件", "AI 模型基建", "5G / 高頻"]},
+    "3026": {"name": "禾伸堂",   "tag": "高容/高壓/高溫 MLCC",        "yf": "3026.TW",  "group": "被動元件",
+             "themes": ["被動元件", "車用電子"]},
+    "6173": {"name": "信昌電",   "tag": "高介電 MLCC · RF 瓷材",      "yf": "6173.TWO", "group": "被動元件",
+             "themes": ["被動元件", "5G / 高頻", "AI 資料中心電力"]},
+    "6449": {"name": "鈺邦",     "tag": "PA-Cap · NVIDIA PSU 供應商", "yf": "6449.TWO", "group": "被動元件",
+             "themes": ["被動元件", "AI 資料中心電力", "AI 加速器"]},
+    "2472": {"name": "立隆電",   "tag": "鋁質電容 · AI 伺服器電源",   "yf": "2472.TW",  "group": "被動元件",
+             "themes": ["被動元件", "AI 資料中心電力", "車用電子"]},
+    "2375": {"name": "凱美",     "tag": "鋁質電容 · 國巨集團",        "yf": "2375.TW",  "group": "被動元件",
+             "themes": ["被動元件"]},
+
+    # 18. 電感
+    "3357": {"name": "台慶科",   "tag": "TLVR · 台廠唯一量產",        "yf": "3357.TWO", "group": "電感",
+             "themes": ["被動元件", "AI 加速器", "車用電子"]},
+    "6862": {"name": "三集瑞-KY","tag": "客製化大功率/TLVR 電感",     "yf": "6862.TW",  "group": "電感",
+             "themes": ["被動元件", "AI 加速器", "AI 資料中心電力"]},
+    "6284": {"name": "佳邦",     "tag": "CMC 共模電感 · PCIe Gen5/6", "yf": "6284.TWO", "group": "電感",
+             "themes": ["被動元件", "Server 高速傳輸"]},
+    "6432": {"name": "今展科",   "tag": "面板/伺服器電源模組電感",    "yf": "6432.TWO", "group": "電感",
+             "themes": ["被動元件", "AI 資料中心電力"]},
+
+    # 19. 被動元件上游 (陶瓷基板 / 磁性材料)
+    "6127": {"name": "九豪",     "tag": "電阻用陶瓷基板",             "yf": "6127.TWO", "group": "被動上游",
+             "themes": ["被動元件"]},
+    "6155": {"name": "鈞寶",     "tag": "磁性粉末/磁芯/電感成品",     "yf": "6155.TWO", "group": "被動上游",
+             "themes": ["被動元件"]},
 }
 
 CACHE_TTL = 300
@@ -156,26 +226,38 @@ def save_json(p: Path, data: Any) -> None:
 
 
 def _migrate_watchlist_groups(wl: dict) -> dict:
-    """套用 DEFAULT_WATCHLIST 的最新族群分類到既有清單。
-    規則：
-    - 既有代號若在 DEFAULT 內，更新 group / tag / name 為新版（族群細分）
-    - 既有代號不在 DEFAULT 內（user 自行加的）→ 保留不動
-    - DEFAULT 有但既有清單沒有 → 不自動加入（避免 user 刻意刪除的又跑回來）
+    """套用 DEFAULT_WATCHLIST 的最新族群分類 + themes 到既有清單。
+    規則:
+    - 既有代號若在 DEFAULT 內,更新 group/tag/themes 為新版
+    - DEFAULT 有但既有沒有 → 自動加入 (新增 watchlist 預設)
+    - 不在 DEFAULT 內 (user 自加) → 保留,但確保有 themes 欄位
     """
     changed = False
     for code, default_meta in DEFAULT_WATCHLIST.items():
-        if code in wl:
-            cur = wl[code]
-            # 只有 group 或 tag 不同才更新 (yf 不動)
-            if cur.get("group") != default_meta["group"] or cur.get("tag") != default_meta["tag"]:
-                cur["group"] = default_meta["group"]
-                cur["tag"]   = default_meta["tag"]
-                if not cur.get("name"):
-                    cur["name"] = default_meta["name"]
-                changed = True
+        if code not in wl:
+            # 新增缺失的預設股票
+            wl[code] = dict(default_meta)
+            changed = True
+            continue
+        cur = wl[code]
+        default_themes = default_meta.get("themes", [])
+        if (cur.get("group") != default_meta["group"]
+            or cur.get("tag") != default_meta["tag"]
+            or cur.get("themes") != default_themes):
+            cur["group"]  = default_meta["group"]
+            cur["tag"]    = default_meta["tag"]
+            cur["themes"] = list(default_themes)
+            if not cur.get("name"):
+                cur["name"] = default_meta["name"]
+            changed = True
+    # 確保 user 自加的也有 themes
+    for code, cur in wl.items():
+        if "themes" not in cur:
+            cur["themes"] = []
+            changed = True
     if changed:
         save_json(WATCHLIST_FILE, wl)
-        print(f"[migrate] watchlist 族群分類已套用最新版")
+        print(f"[migrate] watchlist 分類 + themes 已套用最新版")
     return wl
 
 
@@ -183,7 +265,7 @@ def load_watchlist() -> dict:
     wl = load_json(WATCHLIST_FILE, None)
     if wl is None:
         save_json(WATCHLIST_FILE, DEFAULT_WATCHLIST)
-        return DEFAULT_WATCHLIST.copy()
+        return dict(DEFAULT_WATCHLIST)
     return _migrate_watchlist_groups(wl)
 
 
@@ -510,6 +592,7 @@ def fetch_stock(code: str, period: str = "D", force: bool = False) -> dict:
         "name":   info["name"],
         "tag":    info["tag"],
         "group":  info.get("group", "自選"),
+        "themes": info.get("themes", []) or [],
         "period": period,
         "price":   round(price, 2),
         "prev":    round(prev_close, 2),
@@ -989,6 +1072,7 @@ def fetch_summary(code: str) -> dict:
         "name":   info["name"],
         "tag":    info["tag"],
         "group":  info.get("group", "自選"),
+        "themes": info.get("themes", []) or [],
         "price":  round(last, 2),
         "prev":   round(prev, 2),
         "asOf":   str(hist.index[-1].date()),
@@ -1954,6 +2038,78 @@ def api_group_rotation():
 
 
 # ============================================================================
+# 主題輪動 (Theme Rotation) — 跨族群的主題標籤動量
+# ============================================================================
+@app.get("/api/theme-rotation")
+def api_theme_rotation():
+    """主題輪動:依 themes 標籤聚合,計算每主題 1W/1M/3M 平均報酬 + 動量。"""
+    cache_key = "theme_rotation:90d"
+    cached = cache_get(cache_key)
+    if cached:
+        return cached
+
+    wl = load_watchlist()
+    codes = list(wl.keys())
+    yf_codes = [wl[c]["yf"] for c in codes]
+    end = pd.Timestamp.today()
+    start = end - pd.Timedelta(days=120)
+    try:
+        data = yf.download(yf_codes, start=start, end=end, auto_adjust=False,
+                           progress=False, group_by="ticker", threads=True)
+    except Exception as e:
+        raise HTTPException(503, f"yfinance batch fail: {e}")
+
+    closes = pd.DataFrame()
+    for c, yfc in zip(codes, yf_codes):
+        try:
+            col = data[yfc]["Close"] if len(yf_codes) > 1 else data["Close"]
+            closes[c] = col
+        except Exception:
+            continue
+    closes = closes.dropna(how="all")
+    if len(closes) < 30:
+        raise HTTPException(503, "資料不足")
+
+    def n_day_ret(n):
+        if len(closes) < n + 1: return {}
+        return ((closes.iloc[-1] - closes.iloc[-n-1]) / closes.iloc[-n-1] * 100).to_dict()
+
+    ret_1w = n_day_ret(5)
+    ret_1m = n_day_ret(20)
+    ret_3m = n_day_ret(60) if len(closes) >= 61 else {}
+
+    by_theme: dict[str, list[str]] = {}
+    for code in closes.columns:
+        for t in wl.get(code, {}).get("themes", []) or []:
+            by_theme.setdefault(t, []).append(code)
+
+    from statistics import mean as _mean
+    out = []
+    for t, members in by_theme.items():
+        if len(members) < 2:
+            continue
+        def clean(d):
+            return [v for v in (d.get(c) for c in members) if v is not None and not pd.isna(v)]
+        r1w_v, r1m_v, r3m_v = clean(ret_1w), clean(ret_1m), clean(ret_3m)
+        r1w = _mean(r1w_v) if r1w_v else 0
+        r1m = _mean(r1m_v) if r1m_v else 0
+        r3m = _mean(r3m_v) if r3m_v else 0
+        momentum = round(r1w - (r1m / 4), 2) if r1m_v and r1w_v else 0
+        out.append({
+            "theme":  t,
+            "n":      len(members),
+            "ret_1w": round(r1w, 2),
+            "ret_1m": round(r1m, 2),
+            "ret_3m": round(r3m, 2),
+            "momentum": momentum,
+            "members": members,
+        })
+    out.sort(key=lambda x: -x["momentum"])
+    cache_set(cache_key, out)
+    return out
+
+
+# ============================================================================
 # 市場寬度 (Breadth) — 台股版
 # ============================================================================
 @app.get("/api/breadth")
@@ -2464,7 +2620,12 @@ def root():
 
 # ----------------------------------------------------------------------------
 if __name__ == "__main__":
-    import sys, io
+    import sys, io, os
+    if sys.stdout is None:
+        # pythonw.exe 背景模式下 stdout/stderr 為 None，重導到 log 檔避免 print/reconfigure 崩潰
+        _log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "server.log")
+        sys.stdout = open(_log_path, "a", encoding="utf-8", buffering=1)
+        sys.stderr = sys.stdout
     try:
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
