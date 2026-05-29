@@ -44,7 +44,7 @@ GEMINI_FILE    = ROOT / "gemini.json"
 # ----------------------------------------------------------------------------
 # Default watchlist (首次啟動時寫入 watchlist.json)
 # ----------------------------------------------------------------------------
-DEFAULT_WATCHLIST: dict[str, dict[str, Any]] = {
+_BUILTIN_TW_WATCHLIST: dict[str, dict[str, Any]] = {
     # 1. 晶圓代工
     "2330": {"name": "台積電",   "tag": "晶圓代工 · 先進製程",       "yf": "2330.TW",  "group": "晶圓代工",
              "themes": ["AI 加速器", "半導體代工", "CoWoS / 先進封裝"]},
@@ -186,6 +186,46 @@ DEFAULT_WATCHLIST: dict[str, dict[str, Any]] = {
     "6155": {"name": "鈞寶",     "tag": "磁性粉末/磁芯/電感成品",     "yf": "6155.TWO", "group": "被動上游",
              "themes": ["被動元件"]},
 }
+
+# 共用分類（跨專案單一來源）。讀 shared 的台股分類，把 themes（跨族群標籤）
+# 併進內建活躍清單 → ICC 的 Gemini 自動精進會流進來、且不漂移。
+# group/tag 保留內建（策展、乾淨）供本站族群分組；shared 的 group 名較細碎，
+# 拿來分組會把同族群切散，故不覆蓋。也不把 shared 其餘台股灌進監控清單。
+SHARED_CLASSIFICATION = Path(r"D:\python\shared\stock_classification.json")
+
+
+def _is_tw_symbol(code: str, meta: dict) -> bool:
+    c = str(code).upper().strip()
+    yf = str(meta.get("yf", "")).upper()
+    return c.isdigit() or c.endswith(".TW") or c.endswith(".TWO") or yf.endswith(".TW") or yf.endswith(".TWO")
+
+
+def _load_default_watchlist() -> dict[str, dict[str, Any]]:
+    """內建 55 檔為活躍清單 + 乾淨族群；以 shared 的台股 themes 併入（單一來源、不切散分組）。"""
+    merged = {code: dict(meta) for code, meta in _BUILTIN_TW_WATCHLIST.items()}
+    if SHARED_CLASSIFICATION.exists():
+        try:
+            shared = json.loads(SHARED_CLASSIFICATION.read_text(encoding="utf-8"))
+            enriched = 0
+            for code, meta in shared.items():
+                if not isinstance(meta, dict) or not _is_tw_symbol(code, meta):
+                    continue
+                if code not in merged:  # 不擴張活躍清單
+                    continue
+                shared_themes = meta.get("themes") or []
+                if shared_themes:
+                    cur = merged[code].get("themes") or []
+                    union = list(dict.fromkeys([*cur, *shared_themes]))  # 去重、保序
+                    if union != cur:
+                        merged[code]["themes"] = union
+                        enriched += 1
+            print(f"[init] 已併入 shared 的 themes 至 {enriched} 檔台股（group 保留內建分組）")
+        except Exception as e:
+            print(f"[init] shared 分類讀取失敗，沿用內建: {e}")
+    return merged
+
+
+DEFAULT_WATCHLIST: dict[str, dict[str, Any]] = _load_default_watchlist()
 
 CACHE_TTL = 300
 _cache: dict[str, tuple[float, Any]] = {}
