@@ -1217,10 +1217,40 @@ SCORE_WEIGHT_PRESETS = {
 _SCORE_WEIGHTS = SCORE_WEIGHT_PRESETS["balanced"]
 
 
+def _detect_market_regime() -> tuple[str, str]:
+    """偵測台股 regime。動能盤 → momentum,防禦盤 → value,其餘 → balanced。
+    用 watchlist 寬度 + 加權指數動量判斷。"""
+    try:
+        b = api_breadth()
+    except Exception:
+        return "balanced", "無法判斷,用均衡"
+    pct20 = b.get("pct_above_50", 50)
+    pct60 = b.get("pct_above_200", 50)
+    ad    = b.get("ad_ratio", 1)
+    if pct20 >= 60 and pct60 >= 55:
+        return "momentum", f"動能盤 ({pct20:.0f}% 在 MA20 上, A/D {ad})"
+    if pct20 < 40 or pct60 < 40:
+        return "value", f"防禦盤 (僅 {pct20:.0f}% 在 MA20 上)"
+    return "balanced", f"均衡盤 ({pct20:.0f}% 在 MA20 上)"
+
+
+@app.get("/api/market-regime")
+def api_market_regime():
+    """回傳目前台股 regime 與對應建議權重。"""
+    prefab, note = _detect_market_regime()
+    label = {"momentum": "🚀 動能盤", "value": "🛡️ 防禦盤", "balanced": "⚖️ 均衡盤"}.get(prefab, prefab)
+    return {"regime": prefab, "label": label, "note": note,
+            "suggest_weights": prefab}
+
+
 @app.get("/api/ranking")
 def api_ranking(by: str = "change", weights: str = "balanced"):
     global _SCORE_WEIGHTS
-    _SCORE_WEIGHTS = SCORE_WEIGHT_PRESETS.get(weights, SCORE_WEIGHT_PRESETS["balanced"])
+    if weights == "auto":
+        prefab, _ = _detect_market_regime()
+        _SCORE_WEIGHTS = SCORE_WEIGHT_PRESETS.get(prefab, SCORE_WEIGHT_PRESETS["balanced"])
+    else:
+        _SCORE_WEIGHTS = SCORE_WEIGHT_PRESETS.get(weights, SCORE_WEIGHT_PRESETS["balanced"])
     """熱度榜排序鍵：
     - change / down: 漲幅 / 跌幅
     - volume:        成交量
